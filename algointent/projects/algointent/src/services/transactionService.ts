@@ -289,6 +289,14 @@ export class TransactionService {
         note: metadata.description ? new TextEncoder().encode(metadata.description) : undefined,
       });
 
+      // Auto-opt-in to the newly created NFT
+      try {
+        await this.optInToAsset(sender, Number(result.assetId), signer);
+      } catch (optInError) {
+        console.warn('Auto-opt-in failed:', optInError);
+        // Continue with success message even if opt-in fails
+      }
+
       return {
         status: 'success',
         txid: result.txIds[0],
