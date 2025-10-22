@@ -1,7 +1,16 @@
 import { SupportedWallet, WalletId, WalletManager, WalletProvider } from '@txnlab/use-wallet-react'
 import { SnackbarProvider } from 'notistack'
-import Home from './Home'
-import { getAlgodConfigFromViteEnvironment, getKmdConfigFromViteEnvironment } from './utils/network/getAlgoClientConfigs'
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { ThemeProvider } from "next-themes";
+import Index from "./pages/Index";
+import NotFound from "./pages/NotFound";
+import { getAlgodConfigFromViteEnvironment } from './utils/network/getAlgoClientConfigs'
+
+const queryClient = new QueryClient();
 
 let supportedWallets: SupportedWallet[]
   supportedWallets = [
@@ -33,10 +42,24 @@ export default function App() {
   })
 
   return (
-    <SnackbarProvider maxSnack={3}>
-      <WalletProvider manager={walletManager}>
-        <Home />
-      </WalletProvider>
-    </SnackbarProvider>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+        <TooltipProvider>
+                <SnackbarProvider maxSnack={3} style={{ zIndex: 9999999 }}>
+            <WalletProvider manager={walletManager}>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </BrowserRouter>
+            </WalletProvider>
+          </SnackbarProvider>
+        </TooltipProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
   )
 }
