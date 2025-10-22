@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useWallet } from '@txnlab/use-wallet-react';
 import { TradingService } from '../services/tradingService';
+import { cn } from "@/lib/utils";
 
 interface SwapWidgetProps {
   fromAsset?: string;
@@ -103,170 +104,93 @@ const SwapWidget: React.FC<SwapWidgetProps> = ({ fromAsset, toAsset, amount, onS
   const toMeta = getAssetMeta(to);
 
   return (
-    <div style={{
-      minWidth: 320,
-      maxWidth: 420,
-      width: '100%',
-      background: '#fff',
-      borderRadius: 24,
-      boxShadow: '0 8px 32px rgba(0,0,0,0.10)',
-      padding: '2.2rem 2rem 1.5rem 2rem',
-      margin: '0 auto',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Arial, sans-serif',
-    }}>
-      <div style={{ fontWeight: 800, fontSize: '1.7rem', marginBottom: '2rem', letterSpacing: '-1px', color: '#1a232b', textAlign: 'center' }}>
-        Swap Tokens
-      </div>
+    <div className={cn(
+      "w-full max-w-sm bg-card border border-border rounded-2xl shadow-lg p-6 mx-auto",
+      "text-foreground"
+    )}>
+      <div className="text-xl font-extrabold mb-4 tracking-tight text-center">Swap Tokens</div>
       {/* FROM FIELD */}
-      <div style={{
-        width: '100%',
-        background: '#f6fcfd',
-        borderRadius: '1.5rem',
-        border: '1.5px solid #e0f7fa',
-        padding: '1.2rem 1.3rem 0.7rem 1.3rem',
-        marginBottom: '0.7rem',
-        display: 'flex',
-        flexDirection: 'column',
-        position: 'relative',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
-          <span style={{
-            width: 28,
-            height: 28,
-            borderRadius: '50%',
-            background: from === 'ALGO' ? '#4ecb6e' : '#2563eb',
-            color: '#fff',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontWeight: 800,
-            fontSize: '1.1rem',
-            marginRight: 10
-          }}>{fromMeta.symbol[0]}</span>
-          <span style={{ fontWeight: 700, fontSize: '1.08rem', color: '#1a232b', marginRight: 6 }}>{fromMeta.name}</span>
-          <span style={{ fontWeight: 600, fontSize: '1.01rem', color: '#7a8a99' }}>{fromMeta.symbol}</span>
+      <div className="w-full bg-muted/50 border border-border rounded-xl p-4 mb-1 flex flex-col relative">
+        <div className="flex items-center mb-1.5">
+          <span className={cn(
+            "w-7 h-7 rounded-full text-white inline-flex items-center justify-center font-extrabold mr-2.5",
+            from === 'ALGO' ? 'bg-emerald-500' : 'bg-blue-600'
+          )}>{fromMeta.symbol[0]}</span>
+          <span className="font-bold text-[1.05rem] mr-1.5">{fromMeta.name}</span>
+          <span className="font-semibold text-muted-foreground text-[1.02rem]">{fromMeta.symbol}</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+        <div className="flex items-end justify-between">
           <input
             type="number"
             min={0}
             value={amt}
             onChange={e => setAmt(Number(e.target.value))}
-            style={{
-              border: 'none',
-              background: 'transparent',
-              fontWeight: 800,
-              fontSize: '2.1rem',
-              color: '#1a232b',
-              outline: 'none',
-              width: '70%',
-            }}
+            className="bg-transparent border-0 outline-none font-extrabold text-2xl text-foreground w-3/4"
             placeholder="0.00"
           />
-          <div style={{ textAlign: 'right', color: '#7a8a99', fontWeight: 600, fontSize: '1.08rem', marginBottom: 2 }}>
+          <div className="text-right text-muted-foreground font-semibold text-[1.05rem] mb-0.5">
             {fromUsd !== null ? `≈ $${fromUsd.toFixed(2)}` : ''}
           </div>
         </div>
       </div>
       {/* SWITCH BUTTON */}
-      <div
-        style={{
-          width: 48,
-          height: 48,
-          borderRadius: '50%',
-          background: '#fff',
-          border: '2px solid #e5e7eb',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          margin: '-1.2rem 0',
-          cursor: 'pointer',
-          zIndex: 2,
-        }}
+      <button
+        className="w-10 h-10 rounded-full bg-background border-2 border-border flex items-center justify-center -my-3 cursor-pointer z-10 relative"
         onClick={handleSwitch}
         title="Switch"
+        type="button"
       >
-        <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <g stroke="#888" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="20" height="20" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <g className="stroke-muted-foreground" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M14 7V21" />
             <path d="M10 11L14 7L18 11" />
             <path d="M18 17L14 21L10 17" />
           </g>
         </svg>
-      </div>
+      </button>
       {/* TO FIELD */}
-      <div style={{
-        width: '100%',
-        background: '#f6fcfd',
-        borderRadius: '1.5rem',
-        border: '1.5px solid #e0f7fa',
-        padding: '1.2rem 1.3rem 0.7rem 1.3rem',
-        marginBottom: '1.2rem',
-        display: 'flex',
-        flexDirection: 'column',
-        position: 'relative',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6 }}>
-          <span style={{
-            width: 28,
-            height: 28,
-            borderRadius: '50%',
-            background: to === 'ALGO' ? '#4ecb6e' : '#2563eb',
-            color: '#fff',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontWeight: 800,
-            fontSize: '1.1rem',
-            marginRight: 10
-          }}>{toMeta.symbol[0]}</span>
-          <span style={{ fontWeight: 700, fontSize: '1.08rem', color: '#1a232b', marginRight: 6 }}>{toMeta.name}</span>
-          <span style={{ fontWeight: 600, fontSize: '1.01rem', color: '#7a8a99' }}>{toMeta.symbol}</span>
+      <div className="w-full bg-muted/50 border border-border rounded-xl p-4 mb-3 flex flex-col relative">
+        <div className="flex items-center mb-1.5">
+          <span className={cn(
+            "w-7 h-7 rounded-full text-white inline-flex items-center justify-center font-extrabold mr-2.5",
+            to === 'ALGO' ? 'bg-emerald-500' : 'bg-blue-600'
+          )}>{toMeta.symbol[0]}</span>
+          <span className="font-bold text-[1.05rem] mr-1.5">{toMeta.name}</span>
+          <span className="font-semibold text-muted-foreground text-[1.02rem]">{toMeta.symbol}</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+        <div className="flex items-end justify-between">
           <input
             type="text"
             value={quote && quote.toAmount ? quote.toAmount.toFixed(6) : ''}
             readOnly
-            style={{
-              border: 'none',
-              background: 'transparent',
-              fontWeight: 800,
-              fontSize: '2.1rem',
-              color: '#1a232b',
-              outline: 'none',
-              width: '70%',
-            }}
+            className="bg-transparent border-0 outline-none font-extrabold text-2xl text-foreground w-3/4"
             placeholder="0.00"
           />
-          <div style={{ textAlign: 'right', color: '#7a8a99', fontWeight: 600, fontSize: '1.08rem', marginBottom: 2 }}>
+          <div className="text-right text-muted-foreground font-semibold text-[1.05rem] mb-0.5">
             {quote && quote.toAmount && toUsd !== null ? `≈ $${toUsd.toFixed(2)}` : ''}
           </div>
         </div>
       </div>
       {/* Price Impact and Fee (below fields) */}
       {quote && (
-        <div style={{ width: '100%', marginBottom: 12, color: '#7a8a99', fontWeight: 600, fontSize: '1.01rem', textAlign: 'right' }}>
-          Fee: <span style={{ color: '#1a232b', fontWeight: 700 }}>{quote.fee}</span>
+        <div className="w-full mb-3 text-right text-muted-foreground font-semibold text-[1.01rem]">
+          Fee: <span className="text-foreground font-bold">{quote.fee}</span>
         </div>
       )}
       <button
         onClick={handleSwap}
         disabled={loading || !activeAddress || !from || !to || !amt || from === to}
-        style={{ width: '100%', padding: '1.1rem', borderRadius: '1.2rem', background: '#4ecb6e', color: '#fff', fontWeight: 800, fontSize: '1.15rem', border: 'none', cursor: loading ? 'not-allowed' : 'pointer', marginTop: 4, marginBottom: 2, boxShadow: '0 2px 8px rgba(78,203,110,0.10)', opacity: loading || !activeAddress || from === to ? 0.6 : 1 }}
+        className="w-full py-3 rounded-lg bg-primary text-primary-foreground font-extrabold text-sm shadow-md"
       >
         Swap
       </button>
-      {error && <div style={{ color: '#b91c1c', marginTop: 14, width: '100%', textAlign: 'center', fontWeight: 600 }}>{error}</div>}
+      {error && <div className="text-red-600 mt-3 w-full text-center font-semibold">{error}</div>}
       {swapResult && swapResult.status === 'success' && (
-        <div style={{ color: '#10b981', marginTop: 14, width: '100%', textAlign: 'center', fontWeight: 600 }}>
-          Swap successful! <a href={`https://testnet.explorer.perawallet.app/tx/${swapResult.txid}`} target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb', textDecoration: 'underline' }}>View on Explorer</a>
+        <div className="text-emerald-600 mt-3 w-full text-center font-semibold">
+          Swap successful! <a href={`https://testnet.explorer.perawallet.app/tx/${swapResult.txid}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">View on Explorer</a>
         </div>
       )}
-      {!activeAddress && <div style={{ color: '#b91c1c', marginTop: 12, textAlign: 'center', fontWeight: 500, fontSize: '1.01rem' }}>Connect your wallet to swap</div>}
+      {!activeAddress && <div className="text-red-600 mt-3 text-center font-medium text-[1.01rem]">Connect your wallet to swap</div>}
     </div>
   );
 };
