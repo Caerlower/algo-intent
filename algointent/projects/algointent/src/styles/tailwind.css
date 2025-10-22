@@ -1,1 +1,146 @@
-@import "tailwindcss"; 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    --background: 150 30% 97%;
+    --foreground: 180 10% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 180 10% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 180 10% 10%;
+
+    --primary: 174 100% 42%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 150 20% 95%;
+    --secondary-foreground: 180 10% 10%;
+
+    --muted: 150 15% 92%;
+    --muted-foreground: 180 8% 45%;
+
+    --accent: 174 100% 42%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 150 15% 88%;
+    --input: 150 15% 88%;
+    --ring: 174 100% 42%;
+
+    --radius: 1rem;
+
+    /* Algorand brand colors */
+    --algo-teal: 174 100% 42%;
+    --algo-teal-light: 174 100% 85%;
+    --algo-dark: 180 10% 10%;
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(174 100% 42%) 0%, hsl(150 90% 55%) 100%);
+    --gradient-orb: radial-gradient(circle at 30% 30%, hsl(150 100% 60%) 0%, hsl(174 100% 42%) 50%, hsl(150 80% 50%) 100%);
+    --gradient-bg: linear-gradient(180deg, hsl(150 30% 97%) 0%, hsl(150 40% 95%) 100%);
+    
+    /* Shadows */
+    --shadow-soft: 0 4px 20px -2px hsl(174 100% 42% / 0.1);
+    --shadow-glow: 0 0 30px hsl(174 100% 42% / 0.3);
+    
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .dark {
+    --background: 0 0% 10%;
+    --foreground: 0 0% 98%;
+
+    --card: 0 0% 14%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 0 0% 14%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 150 100% 60%;
+    --primary-foreground: 0 0% 10%;
+
+    --secondary: 0 0% 18%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 0 0% 20%;
+    --muted-foreground: 0 0% 60%;
+
+    --accent: 150 100% 60%;
+    --accent-foreground: 0 0% 10%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 0% 25%;
+    --input: 0 0% 20%;
+    --ring: 150 100% 60%;
+    
+    /* Dark mode gradients */
+    --gradient-bg: linear-gradient(180deg, hsl(0 0% 10%) 0%, hsl(0 0% 8%) 100%);
+    --gradient-orb: radial-gradient(circle at 30% 30%, hsl(150 100% 60%) 0%, hsl(150 100% 50%) 50%, hsl(150 80% 45%) 100%);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    background: var(--gradient-bg);
+    min-height: 100vh;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    filter: brightness(1) drop-shadow(0 0 20px hsl(174 100% 42% / 0.4));
+  }
+  50% {
+    filter: brightness(1.1) drop-shadow(0 0 40px hsl(174 100% 42% / 0.6));
+  }
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+/* Ensure wallet notifications appear above chatbar */
+[data-wallet-modal], 
+[data-wallet-notification],
+.pera-wallet-modal,
+.pera-wallet-notification,
+.wallet-modal,
+.wallet-notification,
+.notistack-SnackbarContainer,
+.notistack-Snackbar,
+[class*="pera"],
+[class*="wallet"],
+div[style*="z-index"],
+div[style*="zIndex"] {
+  z-index: 99999999 !important;
+} 
