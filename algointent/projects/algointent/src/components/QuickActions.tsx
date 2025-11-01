@@ -9,16 +9,16 @@ const QuickActions = ({ onSelectPrompt }: QuickActionsProps) => {
     "Send 10 ALGO to an address",
     "Check my account balance", 
     "Create an ASA token",
-    "Deploy a smart contract",
+    "Swap tokens",
   ];
 
   return (
-    <div className="flex flex-wrap gap-3 justify-center mb-8">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 w-full max-w-3xl justify-center mb-12">
       {prompts.map((prompt) => (
         <Button
           key={prompt}
-          variant="secondary"
-          className="bg-card hover:bg-muted border border-border shadow-sm transition-all hover:shadow-md hover:scale-105"
+          variant="outline"
+          className="h-auto py-3 px-4 text-sm font-normal hover:bg-muted hover:border-primary/50 transition-all bg-white rounded-md shadow-sm"
           onClick={() => onSelectPrompt(prompt)}
         >
           {prompt}
