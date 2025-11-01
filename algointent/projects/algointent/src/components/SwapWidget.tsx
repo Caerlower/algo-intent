@@ -78,7 +78,13 @@ const SwapWidget: React.FC<SwapWidgetProps> = ({ fromAsset, toAsset, amount, onS
       );
       setSwapResult(result);
       if (result.status === 'success') {
-        onSwapCompleted?.(result);
+        // Pass quote data with swap result for transaction details
+        onSwapCompleted?.({
+          ...result,
+          toAmount: quote?.toAmount,
+          fee: quote?.fee,
+          quote: quote
+        });
       } else {
         setError(result.message);
         onSwapFailed?.(result);
@@ -105,19 +111,19 @@ const SwapWidget: React.FC<SwapWidgetProps> = ({ fromAsset, toAsset, amount, onS
 
   return (
     <div className={cn(
-      "w-full max-w-sm bg-card border border-border rounded-2xl shadow-lg p-6 mx-auto",
+      "w-full bg-transparent",
       "text-foreground"
     )}>
-      <div className="text-xl font-extrabold mb-4 tracking-tight text-center">Swap Tokens</div>
+      <div className="text-sm font-bold mb-3 text-foreground">Swap Tokens</div>
       {/* FROM FIELD */}
-      <div className="w-full bg-muted/50 border border-border rounded-xl p-4 mb-1 flex flex-col relative">
+      <div className="w-full bg-primary/5 border border-primary/10 rounded-lg p-3 mb-2 flex flex-col relative">
         <div className="flex items-center mb-1.5">
           <span className={cn(
-            "w-7 h-7 rounded-full text-white inline-flex items-center justify-center font-extrabold mr-2.5",
+            "w-6 h-6 rounded-full text-white inline-flex items-center justify-center font-bold text-xs mr-2",
             from === 'ALGO' ? 'bg-emerald-500' : 'bg-blue-600'
           )}>{fromMeta.symbol[0]}</span>
-          <span className="font-bold text-[1.05rem] mr-1.5">{fromMeta.name}</span>
-          <span className="font-semibold text-muted-foreground text-[1.02rem]">{fromMeta.symbol}</span>
+          <span className="font-semibold text-sm mr-1">{fromMeta.name}</span>
+          <span className="font-medium text-xs text-muted-foreground">{fromMeta.symbol}</span>
         </div>
         <div className="flex items-end justify-between">
           <input
@@ -125,22 +131,22 @@ const SwapWidget: React.FC<SwapWidgetProps> = ({ fromAsset, toAsset, amount, onS
             min={0}
             value={amt}
             onChange={e => setAmt(Number(e.target.value))}
-            className="bg-transparent border-0 outline-none font-extrabold text-2xl text-foreground w-3/4"
+            className="bg-transparent border-0 outline-none font-bold text-lg text-foreground w-3/4"
             placeholder="0.00"
           />
-          <div className="text-right text-muted-foreground font-semibold text-[1.05rem] mb-0.5">
+          <div className="text-right text-muted-foreground font-medium text-xs mb-0.5">
             {fromUsd !== null ? `≈ $${fromUsd.toFixed(2)}` : ''}
           </div>
         </div>
       </div>
       {/* SWITCH BUTTON */}
       <button
-        className="w-10 h-10 rounded-full bg-background border-2 border-border flex items-center justify-center -my-3 cursor-pointer z-10 relative"
+        className="w-8 h-8 rounded-full bg-background border border-border flex items-center justify-center -my-2 cursor-pointer z-10 relative mx-auto"
         onClick={handleSwitch}
         title="Switch"
         type="button"
       >
-        <svg width="20" height="20" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <svg width="16" height="16" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
           <g className="stroke-muted-foreground" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M14 7V21" />
             <path d="M10 11L14 7L18 11" />
@@ -149,48 +155,48 @@ const SwapWidget: React.FC<SwapWidgetProps> = ({ fromAsset, toAsset, amount, onS
         </svg>
       </button>
       {/* TO FIELD */}
-      <div className="w-full bg-muted/50 border border-border rounded-xl p-4 mb-3 flex flex-col relative">
+      <div className="w-full bg-primary/5 border border-primary/10 rounded-lg p-3 mb-3 flex flex-col relative">
         <div className="flex items-center mb-1.5">
           <span className={cn(
-            "w-7 h-7 rounded-full text-white inline-flex items-center justify-center font-extrabold mr-2.5",
+            "w-6 h-6 rounded-full text-white inline-flex items-center justify-center font-bold text-xs mr-2",
             to === 'ALGO' ? 'bg-emerald-500' : 'bg-blue-600'
           )}>{toMeta.symbol[0]}</span>
-          <span className="font-bold text-[1.05rem] mr-1.5">{toMeta.name}</span>
-          <span className="font-semibold text-muted-foreground text-[1.02rem]">{toMeta.symbol}</span>
+          <span className="font-semibold text-sm mr-1">{toMeta.name}</span>
+          <span className="font-medium text-xs text-muted-foreground">{toMeta.symbol}</span>
         </div>
         <div className="flex items-end justify-between">
           <input
             type="text"
             value={quote && quote.toAmount ? quote.toAmount.toFixed(6) : ''}
             readOnly
-            className="bg-transparent border-0 outline-none font-extrabold text-2xl text-foreground w-3/4"
+            className="bg-transparent border-0 outline-none font-bold text-lg text-foreground w-3/4"
             placeholder="0.00"
           />
-          <div className="text-right text-muted-foreground font-semibold text-[1.05rem] mb-0.5">
+          <div className="text-right text-muted-foreground font-medium text-xs mb-0.5">
             {quote && quote.toAmount && toUsd !== null ? `≈ $${toUsd.toFixed(2)}` : ''}
           </div>
         </div>
       </div>
       {/* Price Impact and Fee (below fields) */}
       {quote && (
-        <div className="w-full mb-3 text-right text-muted-foreground font-semibold text-[1.01rem]">
-          Fee: <span className="text-foreground font-bold">{quote.fee}</span>
+        <div className="w-full mb-3 text-right text-muted-foreground text-xs">
+          Fee: <span className="text-foreground font-semibold">{quote.fee}</span>
         </div>
       )}
       <button
         onClick={handleSwap}
         disabled={loading || !activeAddress || !from || !to || !amt || from === to}
-        className="w-full py-3 rounded-lg bg-primary text-primary-foreground font-extrabold text-sm shadow-md"
+        className="w-full py-2 rounded-lg bg-primary text-primary-foreground font-semibold text-sm shadow-sm hover:bg-primary/90 transition-colors"
       >
-        Swap
+        {loading ? 'Swapping...' : 'Swap'}
       </button>
-      {error && <div className="text-red-600 mt-3 w-full text-center font-semibold">{error}</div>}
-      {swapResult && swapResult.status === 'success' && (
-        <div className="text-emerald-600 mt-3 w-full text-center font-semibold">
-          Swap successful! <a href={`https://testnet.explorer.perawallet.app/tx/${swapResult.txid}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">View on Explorer</a>
-        </div>
-      )}
-      {!activeAddress && <div className="text-red-600 mt-3 text-center font-medium text-[1.01rem]">Connect your wallet to swap</div>}
+      {error && <div className="text-red-600 mt-2 w-full text-center text-xs font-medium">{error}</div>}
+              {swapResult && swapResult.status === 'success' && (
+                <div className="text-emerald-600 mt-2 w-full text-center text-xs font-medium">
+                  Swap successful! <a href={`https://lora.algokit.io/testnet/transaction/${swapResult.txid}`} target="_blank" rel="noopener noreferrer" className="text-primary underline">View on Explorer</a>
+                </div>
+              )}
+      {!activeAddress && <div className="text-red-600 mt-2 text-center text-xs font-medium">Connect your wallet to swap</div>}
     </div>
   );
 };
