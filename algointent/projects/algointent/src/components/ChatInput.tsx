@@ -1,7 +1,12 @@
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Send, Image, Paperclip } from "lucide-react";
+import { Send, Plus, Image, Paperclip } from "lucide-react";
 import { useState, useRef } from "react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
@@ -37,19 +42,38 @@ const ChatInput = ({ onSendMessage, disabled, onFileSelect, placeholder }: ChatI
 
   return (
     <div className="w-full max-w-4xl mx-auto">
-      <div className="bg-card border border-border rounded-2xl shadow-lg p-4">
-        <div className="flex items-center gap-3">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-8 w-8 flex-shrink-0"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Image className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
-            <Paperclip className="h-4 w-4" />
-          </Button>
+      <div className="bg-card border border-border rounded-xl sm:rounded-2xl shadow-lg p-4">
+        {/* Input and send button row */}
+        <div className="flex items-center gap-2">
+          {/* Plus button with dropdown menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-10 w-10 rounded-full bg-muted hover:bg-muted/80 shrink-0"
+              >
+                <Plus className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-48">
+              <DropdownMenuItem 
+                onClick={() => fileInputRef.current?.click()}
+                className="cursor-pointer"
+              >
+                <Image className="mr-2 h-4 w-4" />
+                <span>Add photos & files</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => fileInputRef.current?.click()}
+                className="cursor-pointer"
+              >
+                <Paperclip className="mr-2 h-4 w-4" />
+                <span>Attach file</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          
           <input
             type="text"
             value={input}
@@ -60,24 +84,22 @@ const ChatInput = ({ onSendMessage, disabled, onFileSelect, placeholder }: ChatI
                 handleSubmit();
               }
             }}
-            placeholder={placeholder || "Type your message here..."}
-            className="flex-1 min-h-[40px] px-3 py-2 border border-border rounded-lg bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+            placeholder={placeholder || "Type your message here... (e.g., 'send 2 ALGO to K54ZTTHNDB...')"}
+            className="flex-1 border-0 focus-visible:ring-0 text-base bg-transparent outline-none placeholder:text-muted-foreground"
             disabled={disabled}
           />
           <Button
             onClick={handleSubmit}
             disabled={!input.trim() || disabled}
             size="icon"
-            className="h-8 w-8 rounded-full bg-green-500 hover:bg-green-600 flex-shrink-0"
+            className="rounded-full bg-primary hover:bg-primary/90 h-10 w-10 shrink-0"
           >
-            <Send className="h-4 w-4 text-white" />
+            <Send className="h-4 w-4" />
           </Button>
         </div>
-        <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
-          <span className="text-xs text-muted-foreground">
-            Algo Intent AI
-          </span>
-        </div>
+        
+        {/* Algo Intent AI text */}
+        <p className="text-xs text-muted-foreground mt-3">Algo Intent AI</p>
       </div>
       <input
         ref={fileInputRef}
