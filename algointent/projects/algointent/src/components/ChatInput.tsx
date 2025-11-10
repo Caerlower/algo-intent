@@ -13,16 +13,28 @@ interface ChatInputProps {
   disabled?: boolean;
   onFileSelect?: (file: File) => void;
   placeholder?: string;
+  value?: string;
+  onValueChange?: (value: string) => void;
 }
 
-const ChatInput = ({ onSendMessage, disabled, onFileSelect, placeholder }: ChatInputProps) => {
-  const [input, setInput] = useState("");
+const ChatInput = ({ onSendMessage, disabled, onFileSelect, placeholder, value: externalValue, onValueChange }: ChatInputProps) => {
+  const [internalInput, setInternalInput] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Use external value if provided, otherwise use internal state
+  const input = externalValue !== undefined ? externalValue : internalInput;
+  const setInput = onValueChange || setInternalInput;
 
   const handleSubmit = () => {
     if (input.trim() && !disabled) {
       onSendMessage(input.trim());
-      setInput("");
+      // Clear input - if using external value, onValueChange will handle it
+      // Otherwise, clear internal state
+      if (externalValue !== undefined && onValueChange) {
+        onValueChange("");
+      } else {
+        setInternalInput("");
+      }
     }
   };
 
@@ -37,6 +49,11 @@ const ChatInput = ({ onSendMessage, disabled, onFileSelect, placeholder }: ChatI
     const file = event.target.files?.[0];
     if (file && onFileSelect) {
       onFileSelect(file);
+    }
+    // Reset the input value so the same file can be selected again
+    // This also allows the onChange event to fire again for subsequent uploads
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -85,7 +102,7 @@ const ChatInput = ({ onSendMessage, disabled, onFileSelect, placeholder }: ChatI
               }
             }}
             placeholder={placeholder || "Type your message here... (e.g., 'send 2 ALGO to K54ZTTHNDB...')"}
-            className="flex-1 border-0 focus-visible:ring-0 text-base bg-transparent outline-none placeholder:text-muted-foreground"
+            className="flex-1 border-0 focus-visible:ring-0 text-base sm:text-lg bg-transparent outline-none placeholder:text-muted-foreground"
             disabled={disabled}
           />
           <Button
