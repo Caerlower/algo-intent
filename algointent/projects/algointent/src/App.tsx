@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
@@ -29,17 +29,21 @@ let supportedWallets: SupportedWallet[]
 
 function Layout() {
   const location = useLocation();
-  const isAppRoute = location.pathname === "/app";
   const isAppSubdomain = typeof window !== 'undefined' && window.location.hostname === 'app.algointent.xyz';
 
-  // If accessing via app.algointent.xyz subdomain, serve only the chat interface
-  if (isAppSubdomain) {
-    return <Index />;
+  // If accessing via app.algointent.xyz subdomain, redirect to /app route
+  if (isAppSubdomain && location.pathname !== "/app") {
+    return <Navigate to="/app" replace />;
+  }
+
+  // On main domain, redirect /app to landing page (chat interface only accessible via app.algointent.xyz)
+  if (!isAppSubdomain && location.pathname === "/app") {
+    return <Navigate to="/" replace />;
   }
 
   return (
     <>
-      {!isAppRoute && <Navbar />}
+      <Navbar />
       
       <Routes>
         <Route path="/" element={<Landing />} />
@@ -51,7 +55,7 @@ function Layout() {
         <Route path="*" element={<NotFound />} />
       </Routes>
       
-      {!isAppRoute && <Footer />}
+      <Footer />
     </>
   );
 }
