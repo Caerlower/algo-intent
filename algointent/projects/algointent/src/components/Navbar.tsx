@@ -64,11 +64,11 @@ export const Navbar = () => {
               )}
             </Button>
 
-            <a href="https://app.algointent.xyz" target="_self" className="hidden sm:block">
+            <Link to="/app" className="hidden sm:block">
               <Button className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full px-6">
                 Launch App
               </Button>
-            </a>
+            </Link>
 
             <Button
               variant="ghost"
@@ -103,11 +103,11 @@ export const Navbar = () => {
                   {link.label}
                 </Link>
               ))}
-              <a href="https://app.algointent.xyz" target="_self" onClick={() => setIsMenuOpen(false)}>
+              <Link to="/app" onClick={() => setIsMenuOpen(false)}>
                 <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-full">
                   Launch App
                 </Button>
-              </a>
+              </Link>
             </div>
           </div>
         )}
