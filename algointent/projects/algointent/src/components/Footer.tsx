@@ -58,9 +58,9 @@ export const Footer = () => {
                 </Link>
               </li>
               <li>
-                <Link to="/app" className="text-muted-foreground hover:text-primary transition-colors">
+                <a href="https://app.algointent.xyz" target="_self" className="text-muted-foreground hover:text-primary transition-colors">
                   Launch App
-                </Link>
+                </a>
               </li>
             </ul>
           </div>
