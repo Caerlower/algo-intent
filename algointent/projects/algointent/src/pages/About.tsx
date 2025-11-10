@@ -121,11 +121,11 @@ export default function About() {
             <p className="text-xl mb-8 text-white/90">
               Be part of the movement to make blockchain accessible to everyone
             </p>
-            <Link to="/app">
+            <a href="https://app.algointent.xyz" target="_self">
               <Button size="lg" variant="secondary" className="rounded-full px-8">
                 Get Started Today
               </Button>
-            </Link>
+            </a>
           </div>
         </div>
       </section>

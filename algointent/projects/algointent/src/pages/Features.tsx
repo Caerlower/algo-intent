@@ -139,11 +139,11 @@ export default function Features() {
             <p className="text-xl text-muted-foreground mb-8">
               Start using Algo Intent today and see how easy blockchain can be
             </p>
-            <Link to="/app">
+            <a href="https://app.algointent.xyz" target="_self">
               <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-full px-8">
                 Get Started Free
               </Button>
-            </Link>
+            </a>
           </div>
         </div>
       </section>
