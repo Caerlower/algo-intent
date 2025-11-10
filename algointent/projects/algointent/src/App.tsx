@@ -30,6 +30,12 @@ let supportedWallets: SupportedWallet[]
 function Layout() {
   const location = useLocation();
   const isAppRoute = location.pathname === "/app";
+  const isAppSubdomain = typeof window !== 'undefined' && window.location.hostname === 'app.algointent.xyz';
+
+  // If accessing via app.algointent.xyz subdomain, serve only the chat interface
+  if (isAppSubdomain) {
+    return <Index />;
+  }
 
   return (
     <>
