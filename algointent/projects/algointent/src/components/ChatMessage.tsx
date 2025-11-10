@@ -22,6 +22,72 @@ interface ChatMessageProps {
 const parseTransactionDetails = (content: string, widgetParams?: { fromAsset?: string; toAsset?: string; amount?: number; fee?: string }) => {
   const details: { [key: string]: string } = {};
   
+  // Check if this is a price check
+  const isPriceCheck = /current market prices|fetching.*prices|price/i.test(content) && !/sent|sending|transfer|swap|nft|created|balance/i.test(content);
+  
+  if (isPriceCheck) {
+    // Extract price information from format: "ALGO: $0.1852 🟢+2.94%" or "ALGO: $0.1852 +2.94%"
+    // Parse manually by finding price entries in the format: "SYMBOL: $PRICE EMOJI+CHANGE%"
+    let priceEntries: Array<{ symbol: string; price: string; change: string }> = [];
+    
+    // Find all matches of the pattern: "SYMBOL: $PRICE ... CHANGE%"
+    // Split by "Last updated:" to get the price section
+    const priceSection = content.split(/Last updated:/i)[0];
+    
+    // Manual parsing: find all patterns like "SYMBOL: $PRICE ... CHANGE%"
+    // Split by comma to get individual price entries, or use the whole section if no comma
+    const priceParts = priceSection.includes(',') 
+      ? priceSection.split(',').map(p => p.trim())
+      : [priceSection.trim()];
+    
+    for (const part of priceParts) {
+      // Look for pattern: "SYMBOL: $PRICE ... CHANGE%"
+      // Match: ALGO: $0.1865 🟢+4.34%
+      // Match symbol and price separately
+      // Find symbol: "ALGO:"
+      const symbolMatch = part.match(/([A-Z]+):/);
+      // Find price: "$0.1865" - escape $ properly
+      let priceMatch = part.match(/\$(\d+\.\d+)/);
+      if (!priceMatch) {
+        // Try without $ sign - look for price after the symbol
+        const priceAfterSymbol = part.substring(part.indexOf(':') + 1);
+        priceMatch = priceAfterSymbol.match(/(\d+\.\d+)/);
+      }
+      // Find change: "+4.34%" or "-4.34%"
+      const changeMatch = part.match(/([+-]?\d+\.\d+)%/);
+      
+      if (symbolMatch && priceMatch && changeMatch) {
+        const symbol = symbolMatch[1];
+        const price = priceMatch[1];
+        let change = changeMatch[1];
+        
+        // Ensure change has a sign
+        if (!change.startsWith('+') && !change.startsWith('-')) {
+          // Look for + or - before the change in the part
+          const changeIndex = part.indexOf(change);
+          const beforeChange = part.substring(0, changeIndex);
+          const signMatch = beforeChange.match(/([+-])\s*$/);
+          change = (signMatch ? signMatch[1] : '+') + change;
+        }
+        
+        priceEntries.push({ symbol, price, change });
+      }
+    }
+    
+    if (priceEntries.length > 0) {
+      // Store individual price entries for structured display
+      details.priceEntries = JSON.stringify(priceEntries);
+      
+      // Extract last updated time if present
+      const lastUpdatedMatch = content.match(/Last updated:\s*([^\n]+)/i);
+      if (lastUpdatedMatch) {
+        details.lastUpdated = lastUpdatedMatch[1].trim();
+      }
+    }
+    
+    return Object.keys(details).length > 0 ? details : null;
+  }
+  
   // Check if this is a balance check (not a transaction, so no fees)
   const isBalanceCheck = /balance|checking balance|balance:/i.test(content) && !/sent|sending|transfer|swap|nft|created/i.test(content);
   
@@ -51,7 +117,7 @@ const parseTransactionDetails = (content: string, widgetParams?: { fromAsset?: s
       details.assetId = assetIdMatch[1];
     }
     
-    // Extract Name: "Name: alginte" or "Name:alginte" - can be before or after Asset ID
+    // Extract Name: "Name: algointent" or "Name:algointent" - can be before or after Asset ID  
     const nameMatch = content.match(/Name:\s*([^\n,]+)/i);
     if (nameMatch) {
       details.name = nameMatch[1].trim();
@@ -152,13 +218,28 @@ const ChatMessage = ({ role, content, status, txid, imageUrl, isPendingImage, wi
   const isSwap = transactionDetails?.fromAmount && transactionDetails?.toAmount;
   const isBalanceCheck = transactionDetails?.balance !== undefined || transactionDetails?.assets !== undefined;
   const isNFTCreation = transactionDetails?.assetId !== undefined || transactionDetails?.name !== undefined;
-  // Show transaction details for swap success/error or regular sends, or balance checks, or NFT creation
-  const showDetailsSection = transactionDetails && (status === 'success' || status === 'error' || (status === 'pending' && /send|sending|transfer|swap|balance|nft|create/i.test(content)));
+  const isPriceCheck = transactionDetails?.priceEntries !== undefined;
+  
+  // Parse price entries if present
+  let priceEntries: Array<{ symbol: string; price: string; change: string }> = [];
+  if (isPriceCheck && transactionDetails?.priceEntries) {
+    try {
+      priceEntries = JSON.parse(transactionDetails.priceEntries);
+    } catch (e) {
+      // Fallback if parsing fails
+      priceEntries = [];
+    }
+  }
+  // Show transaction details for swap success/error or regular sends, or balance checks, or NFT creation, or price checks
+  const showDetailsSection = transactionDetails && (status === 'success' || status === 'error' || (status === 'pending' && /send|sending|transfer|swap|balance|nft|create|price|fetching/i.test(content)));
   const hasSwapWidget = widgetParams && role === "assistant" && status !== 'success' && status !== 'error';
   
-  // Extract main message text - for balance checks and NFT creation, show simplified message
+  // Extract main message text - for balance checks, price checks, and NFT creation, show simplified message
   let mainContent = content;
-  if (isBalanceCheck && status === 'success') {
+  if (isPriceCheck && status === 'success') {
+    // For price checks, show "Current Market Prices:" as the main message
+    mainContent = 'Current Market Prices:';
+  } else if (isBalanceCheck && status === 'success') {
     // Extract only the "Checking balance for..." part, remove balance info
     // Match "Checking balance for NLZWGP...GZTI." format (with period before Balance:)
     const checkingMatch = content.match(/^(Checking balance for\s+[A-Z0-9]+\.\.\.[A-Z0-9]+\.?)/i);
@@ -211,14 +292,14 @@ const ChatMessage = ({ role, content, status, txid, imageUrl, isPendingImage, wi
         )}
       >
         {role === "assistant" && (
-          <div className="text-primary text-xs sm:text-sm font-medium mb-2">
+          <div className="text-primary text-base sm:text-lg font-medium mb-2">
             Algo Intent
           </div>
         )}
         
         {/* Main message content */}
         <p className={cn(
-          "text-xs sm:text-sm whitespace-pre-wrap break-words",
+          "text-base sm:text-lg whitespace-pre-wrap break-words",
           showDetailsSection ? "mb-3" : "mb-0"
         )}>
           {mainContent || content}
@@ -240,19 +321,63 @@ const ChatMessage = ({ role, content, status, txid, imageUrl, isPendingImage, wi
         {/* Transaction Details Section - show below message content */}
         {showDetailsSection && transactionDetails && (
           <div className="mb-3 p-3 bg-primary/5 rounded-lg border border-primary/10">
-            {isBalanceCheck ? (
+            {isPriceCheck ? (
+              <>
+                {/* Price check details - show each price with improved formatting */}
+                {priceEntries.length > 0 ? (
+                  priceEntries.map((entry, index) => {
+                    const changeColor = parseFloat(entry.change) >= 0 ? '🟢' : '🔴';
+                    // Remove + sign from change, just show the number
+                    const changeValue = entry.change.replace(/^\+/, '');
+                    return (
+                      <div key={index} className={index < priceEntries.length - 1 ? "mb-3" : ""}>
+                        {/* Price line: ALGO:$0.1867 - only price is bold */}
+                        <div className="mb-2">
+                          <span className="text-base text-muted-foreground">{entry.symbol}:</span>
+                          <span className="text-base font-semibold text-foreground">${entry.price}</span>
+                        </div>
+                        {/* Price change line: Price change: 🟢 4.54% */}
+                        <div className="mb-2">
+                          <span className="text-base text-muted-foreground">Price change: </span>
+                          <span className="text-base font-semibold text-foreground">
+                            {changeColor} {changeValue}%
+                          </span>
+                        </div>
+                        {/* Last updated line - no border/divider */}
+                        {transactionDetails.lastUpdated && index === priceEntries.length - 1 && (
+                          <div>
+                            <span className="text-base text-muted-foreground">Last updated: </span>
+                            <span className="text-base font-semibold text-foreground">{transactionDetails.lastUpdated}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                ) : (
+                  // Fallback if parsing fails - show raw content
+                  <div className="text-base text-muted-foreground">{content}</div>
+                )}
+                {/* Show last updated if no price entries were parsed */}
+                {priceEntries.length === 0 && transactionDetails.lastUpdated && (
+                  <div className="mt-2 pt-2 border-t border-primary/10">
+                    <span className="text-base text-muted-foreground">Last updated: </span>
+                    <span className="text-base font-semibold text-foreground">{transactionDetails.lastUpdated}</span>
+                  </div>
+                )}
+              </>
+            ) : isBalanceCheck ? (
               <>
                 {/* Balance check details - no fees */}
                 {transactionDetails.balance && (
                   <div className="flex justify-between mb-2">
-                    <span className="text-xs text-muted-foreground">Balance:</span>
-                    <span className="text-xs font-semibold text-foreground">{transactionDetails.balance}</span>
+                    <span className="text-base text-muted-foreground">Balance:</span>
+                    <span className="text-base font-semibold text-foreground">{transactionDetails.balance}</span>
                   </div>
                 )}
                 {transactionDetails.assets && (
                   <div className="flex justify-between">
-                    <span className="text-xs text-muted-foreground">Assets:</span>
-                    <span className="text-xs font-semibold text-foreground">{transactionDetails.assets}</span>
+                    <span className="text-base text-muted-foreground">Assets:</span>
+                    <span className="text-base font-semibold text-foreground">{transactionDetails.assets}</span>
                   </div>
                 )}
               </>
@@ -261,20 +386,20 @@ const ChatMessage = ({ role, content, status, txid, imageUrl, isPendingImage, wi
                 {/* NFT creation details */}
                 {transactionDetails.name && (
                   <div className="flex justify-between mb-2">
-                    <span className="text-xs text-muted-foreground">Name:</span>
-                    <span className="text-xs font-semibold text-foreground">{transactionDetails.name}</span>
+                    <span className="text-base text-muted-foreground">Name:</span>
+                    <span className="text-base font-semibold text-foreground">{transactionDetails.name}</span>
                   </div>
                 )}
                 {transactionDetails.assetId && (
                   <div className="flex justify-between mb-2">
-                    <span className="text-xs text-muted-foreground">Asset ID:</span>
-                    <span className="text-xs font-semibold text-foreground font-mono">{transactionDetails.assetId}</span>
+                    <span className="text-base text-muted-foreground">Asset ID:</span>
+                    <span className="text-base font-semibold text-foreground font-mono">{transactionDetails.assetId}</span>
                   </div>
                 )}
                 {transactionDetails.fee && (
                   <div className="flex justify-between">
-                    <span className="text-xs text-muted-foreground">Fee:</span>
-                    <span className="text-xs font-semibold text-foreground">{transactionDetails.fee}</span>
+                    <span className="text-base text-muted-foreground">Fee:</span>
+                    <span className="text-base font-semibold text-foreground">{transactionDetails.fee}</span>
                   </div>
                 )}
               </>
@@ -283,20 +408,20 @@ const ChatMessage = ({ role, content, status, txid, imageUrl, isPendingImage, wi
                 {/* Swap transaction details */}
                 {transactionDetails.fromAmount && (
                   <div className="flex justify-between mb-2">
-                    <span className="text-xs text-muted-foreground">From:</span>
-                    <span className="text-xs font-semibold text-foreground">{transactionDetails.fromAmount}</span>
+                    <span className="text-base text-muted-foreground">From:</span>
+                    <span className="text-base font-semibold text-foreground">{transactionDetails.fromAmount}</span>
                   </div>
                 )}
                 {transactionDetails.toAmount && (
                   <div className="flex justify-between mb-2">
-                    <span className="text-xs text-muted-foreground">To:</span>
-                    <span className="text-xs font-semibold text-foreground">{transactionDetails.toAmount}</span>
+                    <span className="text-base text-muted-foreground">To:</span>
+                    <span className="text-base font-semibold text-foreground">{transactionDetails.toAmount}</span>
                   </div>
                 )}
                 {transactionDetails.fee && (
                   <div className="flex justify-between">
-                    <span className="text-xs text-muted-foreground">Fee:</span>
-                    <span className="text-xs font-semibold text-foreground">{transactionDetails.fee}</span>
+                    <span className="text-base text-muted-foreground">Fee:</span>
+                    <span className="text-base font-semibold text-foreground">{transactionDetails.fee}</span>
                   </div>
                 )}
               </>
@@ -305,14 +430,14 @@ const ChatMessage = ({ role, content, status, txid, imageUrl, isPendingImage, wi
                 {/* Regular ALGO send transaction details */}
                 {transactionDetails.amount && (
                   <div className="flex justify-between mb-2">
-                    <span className="text-xs text-muted-foreground">Amount:</span>
-                    <span className="text-xs font-semibold text-foreground">{transactionDetails.amount}</span>
+                    <span className="text-base text-muted-foreground">Amount:</span>
+                    <span className="text-base font-semibold text-foreground">{transactionDetails.amount}</span>
                   </div>
                 )}
                 {transactionDetails.to && (
                   <div className="flex justify-between mb-2">
-                    <span className="text-xs text-muted-foreground">To:</span>
-                    <span className="text-xs font-mono text-foreground">
+                    <span className="text-base text-muted-foreground">To:</span>
+                    <span className="text-base font-mono text-foreground">
                       {transactionDetails.to.includes('...') 
                         ? transactionDetails.to
                         : transactionDetails.to.length > 15 
@@ -323,8 +448,8 @@ const ChatMessage = ({ role, content, status, txid, imageUrl, isPendingImage, wi
                 )}
                 {transactionDetails.fee && (
                   <div className="flex justify-between">
-                    <span className="text-xs text-muted-foreground">Fee:</span>
-                    <span className="text-xs font-semibold text-foreground">{transactionDetails.fee}</span>
+                    <span className="text-base text-muted-foreground">Fee:</span>
+                    <span className="text-base font-semibold text-foreground">{transactionDetails.fee}</span>
                   </div>
                 )}
               </>
@@ -346,7 +471,7 @@ const ChatMessage = ({ role, content, status, txid, imageUrl, isPendingImage, wi
         {/* Status and Transaction ID - combined section */}
         <div className="mt-3 pt-2 border-t border-border/50">
           {status && (
-            <div className={cn("flex items-center gap-2 mb-2 text-[10px] sm:text-xs", {
+            <div className={cn("flex items-center gap-2 mb-2 text-sm sm:text-base", {
               "text-yellow-600": status === 'pending',
               "text-green-600": status === 'success',
               "text-red-600": status === 'error'
@@ -380,8 +505,8 @@ const ChatMessage = ({ role, content, status, txid, imageUrl, isPendingImage, wi
           )}
           
                   {txid && (
-                    <div className="text-[10px] sm:text-xs text-muted-foreground">
-                      <span className="text-muted-foreground">TxID: </span>
+                    <div className="text-sm sm:text-base text-muted-foreground">
+                      <span className="text-muted-foreground">Transaction ID: </span>
                       <a 
                         href={`https://lora.algokit.io/testnet/transaction/${txid}`} 
                         target="_blank" 
