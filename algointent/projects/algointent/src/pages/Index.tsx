@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useTheme } from "next-themes";
 import { useEnhancedWallet } from '../providers/EnhancedWalletProvider';
-import { useSnackbar } from 'notistack';
 import { aiIntentService, ParsedIntent } from '../services/aiIntentService';
 import { TransactionService, NFTMetadata } from '../services/transactionService';
 import { tradingService, tinymanSigner } from '../services/tradingService';
@@ -68,13 +67,13 @@ const Index = () => {
   const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [greeting, setGreeting] = useState(getGreeting());
+  const [inputValue, setInputValue] = useState("");
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
   
   const { activeAddress, transactionSigner, signTransactions, isGoogleConnected, googleUser, googleWallet } = useEnhancedWallet();
-  const { enqueueSnackbar } = useSnackbar();
   const { theme, setTheme } = useTheme();
 
   const navLinks = [
@@ -155,7 +154,7 @@ const Index = () => {
           const info = await transactionService.getAccountBalance(activeAddress);
           setAccountInfo(info);
         } catch (error) {
-          enqueueSnackbar('Failed to fetch balance', { variant: 'error' });
+          // Silently fail - balance will be fetched on next transaction
         }
       }
     };
@@ -234,16 +233,17 @@ const Index = () => {
   const handleSendMessage = async (content: string) => {
     if (!content.trim()) return;
     if (!activeAddress) {
-      enqueueSnackbar('Please connect your wallet first', { variant: 'warning' });
+      addBotMessage('⚠️ Please connect your wallet first to use Algo Intent.');
       return;
     }
 
     const userInput = content.trim();
     
-    // If there's a selected file, add it as a message first
-    if (selectedFile && filePreview) {
-      addUserMessage(`📸 Uploaded: ${selectedFile.name}`, filePreview);
-    }
+    // Clear input after sending
+    setInputValue("");
+    
+    // Note: Image is already shown when uploaded via handleFileSelect
+    // Don't add it again here to avoid duplicates
     
     addUserMessage(userInput);
     setIsProcessing(true);
@@ -270,7 +270,16 @@ const Index = () => {
   };
 
   const handleSelectPrompt = (prompt: string) => {
-    handleSendMessage(prompt);
+    setInputValue(prompt);
+    // Focus the input field after setting the value
+    setTimeout(() => {
+      const inputElement = document.querySelector('input[type="text"]') as HTMLInputElement;
+      if (inputElement) {
+        inputElement.focus();
+        // Move cursor to end of text
+        inputElement.setSelectionRange(prompt.length, prompt.length);
+      }
+    }, 0);
   };
 
   // Utility to sanitize AI output
@@ -289,10 +298,235 @@ const Index = () => {
     return sanitized.trim();
   };
 
-  const handleIntent = async (intent: ParsedIntent, file: File | null) => {
+  // Utility to format error messages in a user-friendly way
+  const formatErrorMessage = (error: any, action: string): string => {
+    const errorMessage = error instanceof Error ? error.message : String(error || 'Unknown error');
+    
+    // Handle common error patterns and make them user-friendly
+    if (errorMessage.includes('rejected') || errorMessage.includes('user has rejected')) {
+      return `Transaction cancelled. The transaction was not approved in your wallet.`;
+    }
+    if (errorMessage.includes('Confirmation Failed') || errorMessage.includes('4100')) {
+      return `Transaction cancelled. Please try again when you're ready.`;
+    }
+    if (errorMessage.includes('insufficient') || errorMessage.includes('balance')) {
+      return `Insufficient balance. Please check your wallet balance and try again.`;
+    }
+    if (errorMessage.includes('Invalid') && errorMessage.includes('address')) {
+      return `Invalid address format. Please check the recipient address and try again.`;
+    }
+    if (errorMessage.includes('must optin') || errorMessage.includes('opt-in')) {
+      return `Recipient must opt-in to receive this asset first.`;
+    }
+    if (errorMessage.includes('already in ledger')) {
+      return `Transaction already completed successfully.`;
+    }
+    
+    // For other errors, provide a clean message
+    return `${action} failed. Please try again or check your wallet connection.`;
+  };
+
+  const handleIntent = async (intent: ParsedIntent | any, file: File | null) => {
+    // Check if this is a multi-intent response
+    if (intent.intents && Array.isArray(intent.intents)) {
+      // Handle multiple intents - try atomic execution first
+      const multiIntent = intent as { intents: ParsedIntent[]; explanation?: string };
+      
+      if (multiIntent.explanation) {
+        addBotMessage(sanitizeBotText(multiIntent.explanation));
+      }
+      
+      // Check if all intents can be executed atomically
+      const atomicCompatibleIntents = ['send_algo', 'send_asset', 'opt_in', 'opt_out', 'send_nft'];
+      const canExecuteAtomically = multiIntent.intents.every(
+        singleIntent => atomicCompatibleIntents.includes(singleIntent.intent)
+      );
+      
+      if (canExecuteAtomically && multiIntent.intents.length > 1) {
+        // Execute atomically
+        await handleAtomicIntents(multiIntent.intents);
+      } else {
+        // Execute sequentially (for non-atomic compatible intents or single intent)
+        for (const singleIntent of multiIntent.intents) {
+          await handleSingleIntent(singleIntent, file);
+          // Small delay between actions to ensure proper sequencing
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+      return;
+    }
+    
+    // Handle single intent
+    await handleSingleIntent(intent as ParsedIntent, file);
+  };
+
+  const handleAtomicIntents = async (intents: ParsedIntent[]) => {
+    if (!activeAddress || !transactionSigner) {
+      addBotMessage('❌ Wallet not connected. Please connect your wallet first.');
+      return;
+    }
+
+    // Build atomic transaction list
+    const atomicTransactions: Array<{
+      type: 'send_algo' | 'send_asset' | 'opt_in' | 'opt_out' | 'send_nft';
+      params: {
+        recipient?: string;
+        amount?: number;
+        assetId?: number;
+        assetName?: string;
+      };
+    }> = [];
+
+    // Build description for the message
+    const descriptions: string[] = [];
+
+    for (const intent of intents) {
+      const { intent: action, parameters } = intent;
+
+      switch (action) {
+        case 'send_algo':
+          if (parameters.amount !== undefined && parameters.amount !== null && !isNaN(parameters.amount) && parameters.recipient) {
+            const amount = Number(parameters.amount);
+            if (!isNaN(amount) && amount > 0) {
+              atomicTransactions.push({
+                type: 'send_algo',
+                params: {
+                  recipient: parameters.recipient,
+                  amount: amount
+                }
+              });
+              const recipientDisplay = `${parameters.recipient.substring(0, 6)}...${parameters.recipient.substring(parameters.recipient.length - 4)}`;
+              descriptions.push(`send ${amount} ALGO to ${recipientDisplay}`);
+            }
+          }
+          break;
+
+        case 'send_asset':
+          if (parameters.amount !== undefined && parameters.amount !== null && !isNaN(parameters.amount) && parameters.recipient && parameters.asset_id) {
+            const amount = Number(parameters.amount);
+            const assetId = typeof parameters.asset_id === 'number' ? parameters.asset_id : parseInt(parameters.asset_id);
+            if (!isNaN(amount) && amount > 0 && !isNaN(assetId)) {
+              // Map asset names to IDs if needed
+              let finalAssetId = assetId;
+              let assetName = parameters.asset_name || `Asset ${assetId}`;
+              
+              // Check if it's a known asset by name
+              if (parameters.asset_name) {
+                const assetNameUpper = parameters.asset_name.toUpperCase();
+                if (assetNameUpper === 'USDC') {
+                  finalAssetId = 10458941; // USDC testnet asset ID
+                  assetName = 'USDC';
+                } else if (assetNameUpper === 'USDT') {
+                  finalAssetId = 10458942; // USDT testnet asset ID (if exists)
+                  assetName = 'USDT';
+                }
+              }
+              
+              atomicTransactions.push({
+                type: 'send_asset',
+                params: {
+                  recipient: parameters.recipient,
+                  amount: amount,
+                  assetId: finalAssetId,
+                  assetName: assetName
+                }
+              });
+              const recipientDisplay = `${parameters.recipient.substring(0, 6)}...${parameters.recipient.substring(parameters.recipient.length - 4)}`;
+              descriptions.push(`send ${amount} ${assetName} to ${recipientDisplay}`);
+            }
+          }
+          break;
+
+        case 'opt_in':
+          if (parameters.asset_id) {
+            const assetId = typeof parameters.asset_id === 'number' ? parameters.asset_id : parseInt(parameters.asset_id);
+            atomicTransactions.push({
+              type: 'opt_in',
+              params: {
+                assetId: assetId
+              }
+            });
+            descriptions.push(`opt in to asset ${assetId}`);
+          }
+          break;
+
+        case 'opt_out':
+          if (parameters.asset_id) {
+            const assetId = typeof parameters.asset_id === 'number' ? parameters.asset_id : parseInt(parameters.asset_id);
+            atomicTransactions.push({
+              type: 'opt_out',
+              params: {
+                assetId: assetId
+              }
+            });
+            descriptions.push(`opt out of asset ${assetId}`);
+          }
+          break;
+
+        case 'send_nft':
+          if (parameters.asset_id && parameters.recipient) {
+            const assetId = typeof parameters.asset_id === 'number' ? parameters.asset_id : parseInt(parameters.asset_id);
+            atomicTransactions.push({
+              type: 'send_nft',
+              params: {
+                recipient: parameters.recipient,
+                assetId: assetId
+              }
+            });
+            const recipientDisplay = `${parameters.recipient.substring(0, 6)}...${parameters.recipient.substring(parameters.recipient.length - 4)}`;
+            descriptions.push(`send NFT ${assetId} to ${recipientDisplay}`);
+          }
+          break;
+      }
+    }
+
+    if (atomicTransactions.length === 0) {
+      addBotMessage('❌ No valid atomic transactions to execute.');
+      return;
+    }
+
+    // Create initial message
+    const messageId = addBotMessage(
+      `Executing atomic transaction: ${descriptions.join(', ')}`,
+      'pending'
+    );
+
+    try {
+      // Execute atomic transactions
+      const result = await transactionService.executeAtomicTransactions(
+        activeAddress,
+        atomicTransactions,
+        transactionSigner
+      );
+
+      await updateBalance();
+
+      if (result.status === 'success') {
+        updateMessage(messageId, {
+          content: result.message,
+          status: 'success',
+          txid: result.txid
+        });
+      } else {
+        const friendlyError = formatErrorMessage(result.error || result.message, 'Atomic transaction');
+        updateMessage(messageId, {
+          content: friendlyError,
+          status: 'error'
+        });
+      }
+    } catch (error) {
+      const friendlyError = formatErrorMessage(error, 'Atomic transaction');
+      updateMessage(messageId, {
+        content: friendlyError,
+        status: 'error'
+      });
+    }
+  };
+
+  const handleSingleIntent = async (intent: ParsedIntent, file: File | null) => {
     const { intent: action, parameters, context, explanation } = intent;
 
-    // Always show explanation if present
+    // Always show explanation if present (for all actions including price checks)
     if (explanation) {
       addBotMessage(sanitizeBotText(explanation));
       // If the intent is not actionable, return early
@@ -302,6 +536,12 @@ const Index = () => {
       ].includes(action)) {
         return;
       }
+    }
+
+    // Handle price checks - show explanation first, then fetch prices
+    if (action === 'check_prices' || action === 'market_info') {
+      await handleCheckPrices(parameters);
+      return;
     }
 
     // Handle trading operations
@@ -317,11 +557,6 @@ const Index = () => {
 
     if (action === 'set_stop_loss') {
       await handleSetStopLoss(parameters);
-      return;
-    }
-
-    if (action === 'check_prices' || action === 'market_info') {
-      await handleCheckPrices(parameters);
       return;
     }
 
@@ -361,18 +596,18 @@ const Index = () => {
   const handleSendAlgo = async (parameters: any) => {
     if (!activeAddress || !algosdk.isValidAddress(activeAddress)) {
       addBotMessage('❌ Your wallet address is not valid. Please reconnect your wallet.');
-      enqueueSnackbar('Invalid sender address', { variant: 'error' });
       return;
     }
     if (!parameters.amount || !parameters.recipient) {
       addBotMessage('❌ Missing amount or recipient address for ALGO transfer.');
-      enqueueSnackbar('Missing amount or recipient address', { variant: 'error' });
       return;
     }
     
-    // Create initial message with pending status
-    const messageId = addBotMessage(`Sending ${parameters.amount} ALGO to ${parameters.recipient.substring(0, 6)}...${parameters.recipient.substring(parameters.recipient.length - 4)}`, 'pending');
-    enqueueSnackbar('Sending ALGO...', { variant: 'info' });
+    // Format recipient address for display
+    const recipientDisplay = `${parameters.recipient.substring(0, 6)}...${parameters.recipient.substring(parameters.recipient.length - 4)}`;
+    
+    // Create initial message with pending status - format it so transaction details can be parsed
+    const messageId = addBotMessage(`Sending ${parameters.amount} ALGO to ${recipientDisplay}`, 'pending');
     
     try {
       const result = await transactionService.sendAlgo(
@@ -383,39 +618,38 @@ const Index = () => {
       );
       await updateBalance();
       if (result.status === 'success') {
-        // Update same message with success status
+        // Update same message with success status - format for transaction details parsing
         updateMessage(messageId, {
-          content: `Transaction successful! ${parameters.amount} ALGO sent to ${parameters.recipient.substring(0, 6)}...${parameters.recipient.substring(parameters.recipient.length - 4)}`,
+          content: `Transaction successful! ${parameters.amount} ALGO sent to ${recipientDisplay}`,
           status: 'success',
           txid: result.txid
         });
-        enqueueSnackbar('Transaction successful!', { variant: 'success' });
       } else {
-        // Update same message with error status
+        // Update same message with user-friendly error status
+        const friendlyError = formatErrorMessage(result.error || result.message, 'Transaction');
         updateMessage(messageId, {
-          content: result.message,
+          content: friendlyError,
           status: 'error'
         });
-        enqueueSnackbar('Transaction failed', { variant: 'error' });
       }
     } catch (error) {
-      // Update same message with error status
+      // Update same message with user-friendly error status
+      const friendlyError = formatErrorMessage(error, 'Transaction');
       updateMessage(messageId, {
-        content: `Failed to send ALGO: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        content: friendlyError,
         status: 'error'
       });
-      enqueueSnackbar('Transaction failed', { variant: 'error' });
     }
   };
 
   const handleCreateNFT = async (parameters: any, file: File | null) => {
     if (!parameters.name) {
       addBotMessage('❌ NFT name is required.');
-      enqueueSnackbar('NFT name is required', { variant: 'error' });
       return;
     }
-    const messageId = addBotMessage(`Creating NFT "${parameters.name}"...`, 'pending');
-    enqueueSnackbar('Creating NFT...', { variant: 'info' });
+    const supply = parameters.supply && parameters.supply > 0 ? parameters.supply : 1;
+    const supplyText = supply > 1 ? `${supply} NFTs` : 'NFT';
+    const messageId = addBotMessage(`Creating ${supplyText} "${parameters.name}"...`, 'pending');
     try {
       let ipfsUrl = '';
       if (file) {
@@ -423,18 +657,16 @@ const Index = () => {
         if (uploadResult.success) {
           ipfsUrl = uploadResult.ipfsUrl!;
           // Update message with IPFS info
-          updateMessage(messageId, { content: `Creating NFT "${parameters.name}"...\n📤 File uploaded to IPFS: ${uploadResult.ipfsHash}` });
-          enqueueSnackbar('File uploaded to IPFS', { variant: 'success' });
+          updateMessage(messageId, { content: `Creating ${supplyText} "${parameters.name}"...\n📤 File uploaded to IPFS: ${uploadResult.ipfsHash}` });
         } else {
           // Update message with upload failure
-          updateMessage(messageId, { content: `Creating NFT "${parameters.name}"...\n⚠️ File upload failed: ${uploadResult.error}. Creating NFT without media.` });
-          enqueueSnackbar('File upload failed', { variant: 'warning' });
+          updateMessage(messageId, { content: `Creating ${supplyText} "${parameters.name}"...\n⚠️ File upload failed: ${uploadResult.error}. Creating NFT without media.` });
         }
       }
       const metadata: NFTMetadata = {
         name: parameters.name,
         unitName: generateUnitName(parameters.name),
-        totalSupply: parameters.supply || 1,
+        totalSupply: supply,
         description: parameters.description || '',
         url: ipfsUrl
       };
@@ -446,45 +678,43 @@ const Index = () => {
       await updateBalance();
       if (result.status === 'success') {
         updateMessage(messageId, { content: result.message, status: 'success', txid: result.txid });
-        enqueueSnackbar('NFT created successfully!', { variant: 'success' });
         clearPendingImage();
       } else {
-        updateMessage(messageId, { content: result.message, status: 'error' });
-        enqueueSnackbar('NFT creation failed', { variant: 'error' });
+        const friendlyError = formatErrorMessage(result.error || result.message, 'NFT creation');
+        updateMessage(messageId, { content: friendlyError, status: 'error' });
       }
     } catch (error) {
-      updateMessage(messageId, { content: `Failed to create NFT: ${error instanceof Error ? error.message : 'Unknown error'}`, status: 'error' });
-      enqueueSnackbar('NFT creation failed', { variant: 'error' });
+      const friendlyError = formatErrorMessage(error, 'NFT creation');
+      updateMessage(messageId, { content: friendlyError, status: 'error' });
     }
   };
 
   const handleCreateNFTWithImage = async (parameters: any, file: File | null) => {
     if (!file) {
       addBotMessage('❌ No image found. Please upload an image first.');
-      enqueueSnackbar('No image found', { variant: 'error' });
       return;
     }
 
     const nftName = parameters.name || `NFT_${Date.now()}`;
-    const messageId = addBotMessage(`Creating NFT "${nftName}" with uploaded image...`, 'pending');
-    enqueueSnackbar('Creating NFT with image...', { variant: 'info' });
+    const supply = parameters.supply && parameters.supply > 0 ? parameters.supply : 1;
+    const supplyText = supply > 1 ? `${supply} NFTs` : 'NFT';
+    const messageId = addBotMessage(`Creating ${supplyText} "${nftName}" with uploaded image...`, 'pending');
     
     try {
       const uploadResult = await ipfsService.uploadToIPFS(file);
       if (!uploadResult.success) {
-        updateMessage(messageId, { content: `Image upload failed: ${uploadResult.error}`, status: 'error' });
-        enqueueSnackbar('Image upload failed', { variant: 'error' });
+        const friendlyError = formatErrorMessage(uploadResult.error, 'Image upload');
+        updateMessage(messageId, { content: friendlyError, status: 'error' });
         return;
       }
 
       // Update message with IPFS info
-      updateMessage(messageId, { content: `Creating NFT "${nftName}" with uploaded image...\n📤 Image uploaded to IPFS: ${uploadResult.ipfsHash}` });
-      enqueueSnackbar('Image uploaded to IPFS', { variant: 'success' });
+      updateMessage(messageId, { content: `Creating ${supplyText} "${nftName}" with uploaded image...\n📤 Image uploaded to IPFS: ${uploadResult.ipfsHash}` });
 
       const metadata: NFTMetadata = {
         name: nftName,
         unitName: generateUnitName(nftName),
-        totalSupply: parameters.supply || 1,
+        totalSupply: supply,
         description: parameters.description || `NFT created with uploaded image`,
         url: uploadResult.ipfsUrl!
       };
@@ -499,15 +729,14 @@ const Index = () => {
       
       if (result.status === 'success') {
         updateMessage(messageId, { content: result.message, status: 'success', txid: result.txid });
-        enqueueSnackbar('NFT created successfully!', { variant: 'success' });
         clearPendingImage();
       } else {
-        updateMessage(messageId, { content: result.message, status: 'error' });
-        enqueueSnackbar('NFT creation failed', { variant: 'error' });
+        const friendlyError = formatErrorMessage(result.error || result.message, 'NFT creation');
+        updateMessage(messageId, { content: friendlyError, status: 'error' });
       }
     } catch (error) {
-      updateMessage(messageId, { content: `Failed to create NFT: ${error instanceof Error ? error.message : 'Unknown error'}`, status: 'error' });
-      enqueueSnackbar('NFT creation failed', { variant: 'error' });
+      const friendlyError = formatErrorMessage(error, 'NFT creation');
+      updateMessage(messageId, { content: friendlyError, status: 'error' });
     }
   };
 
@@ -530,14 +759,13 @@ const Index = () => {
       await updateBalance();
       if (result.status === 'success') {
         updateMessage(messageId, { content: result.message, status: 'success', txid: result.txid });
-        enqueueSnackbar('NFT transferred successfully!', { variant: 'success' });
       } else {
-        updateMessage(messageId, { content: result.message, status: 'error' });
-        enqueueSnackbar('NFT transfer failed', { variant: 'error' });
+        const friendlyError = formatErrorMessage(result.error || result.message, 'NFT transfer');
+        updateMessage(messageId, { content: friendlyError, status: 'error' });
       }
     } catch (error) {
-      updateMessage(messageId, { content: `Failed to send NFT: ${error instanceof Error ? error.message : 'Unknown error'}`, status: 'error' });
-      enqueueSnackbar('NFT transfer failed', { variant: 'error' });
+      const friendlyError = formatErrorMessage(error, 'NFT transfer');
+      updateMessage(messageId, { content: friendlyError, status: 'error' });
     }
   };
 
@@ -559,14 +787,13 @@ const Index = () => {
       await updateBalance();
       if (result.status === 'success') {
         updateMessage(messageId, { content: result.message, status: 'success', txid: result.txid });
-        enqueueSnackbar('Opt-in successful!', { variant: 'success' });
       } else {
-        updateMessage(messageId, { content: result.message, status: 'error' });
-        enqueueSnackbar('Opt-in failed', { variant: 'error' });
+        const friendlyError = formatErrorMessage(result.error || result.message, 'Opt-in');
+        updateMessage(messageId, { content: friendlyError, status: 'error' });
       }
     } catch (error) {
-      updateMessage(messageId, { content: `Failed to opt-in: ${error instanceof Error ? error.message : 'Unknown error'}`, status: 'error' });
-      enqueueSnackbar('Opt-in failed', { variant: 'error' });
+      const friendlyError = formatErrorMessage(error, 'Opt-in');
+      updateMessage(messageId, { content: friendlyError, status: 'error' });
     }
   };
 
@@ -588,14 +815,13 @@ const Index = () => {
       await updateBalance();
       if (result.status === 'success') {
         updateMessage(messageId, { content: result.message, status: 'success', txid: result.txid });
-        enqueueSnackbar('Opt-out successful!', { variant: 'success' });
       } else {
-        updateMessage(messageId, { content: result.message, status: 'error' });
-        enqueueSnackbar('Opt-out failed', { variant: 'error' });
+        const friendlyError = formatErrorMessage(result.error || result.message, 'Opt-out');
+        updateMessage(messageId, { content: friendlyError, status: 'error' });
       }
     } catch (error) {
-      updateMessage(messageId, { content: `Failed to opt-out: ${error instanceof Error ? error.message : 'Unknown error'}`, status: 'error' });
-      enqueueSnackbar('Opt-out failed', { variant: 'error' });
+      const friendlyError = formatErrorMessage(error, 'Opt-out');
+      updateMessage(messageId, { content: friendlyError, status: 'error' });
     }
   };
 
@@ -605,7 +831,6 @@ const Index = () => {
     
     // Create initial message with pending status
     const messageId = addBotMessage(`Checking balance for ${addressDisplay}`, 'pending');
-    enqueueSnackbar('Checking balance...', { variant: 'info' });
     try {
       const balance = await transactionService.getAccountBalance(activeAddress!);
       setAccountInfo(balance);
@@ -615,14 +840,13 @@ const Index = () => {
         content: `Checking balance for ${addressDisplay}. Balance: ${balance.algo.toFixed(6)} ALGO Assets: ${balance.assets.length}`,
         status: 'success'
       });
-      enqueueSnackbar('Balance updated', { variant: 'success' });
     } catch (error) {
       // Update same message with error status
+      const friendlyError = formatErrorMessage(error, 'Balance check');
       updateMessage(messageId, {
-        content: `Failed to check balance: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        content: friendlyError,
         status: 'error'
       });
-      enqueueSnackbar('Failed to check balance', { variant: 'error' });
     }
   };
 
@@ -632,7 +856,7 @@ const Index = () => {
         const info = await transactionService.getAccountBalance(activeAddress);
         setAccountInfo(info);
       } catch (error) {
-        enqueueSnackbar('Failed to fetch balance', { variant: 'error' });
+        // Silently fail - balance will be fetched on next transaction
       }
     }
   };
@@ -689,14 +913,13 @@ const Index = () => {
 
       if (result.status === 'success') {
         addBotMessage(result.message, 'success', result.txid);
-        enqueueSnackbar('Limit order set successfully!', { variant: 'success' });
       } else {
-        addBotMessage(result.message, 'error');
-        enqueueSnackbar('Limit order failed', { variant: 'error' });
+        const friendlyError = formatErrorMessage(result.error || result.message, 'Limit order');
+        addBotMessage(friendlyError, 'error');
       }
     } catch (error) {
-      addBotMessage(`❌ Limit order failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
-      enqueueSnackbar('Limit order failed', { variant: 'error' });
+      const friendlyError = formatErrorMessage(error, 'Limit order');
+      addBotMessage(friendlyError, 'error');
     }
   };
 
@@ -719,42 +942,57 @@ const Index = () => {
 
       if (result.status === 'success') {
         addBotMessage(result.message, 'success', result.txid);
-        enqueueSnackbar('Stop-loss set successfully!', { variant: 'success' });
       } else {
-        addBotMessage(result.message, 'error');
-        enqueueSnackbar('Stop-loss failed', { variant: 'error' });
+        const friendlyError = formatErrorMessage(result.error || result.message, 'Stop-loss');
+        addBotMessage(friendlyError, 'error');
       }
     } catch (error) {
-      addBotMessage(`❌ Stop-loss failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
-      enqueueSnackbar('Stop-loss failed', { variant: 'error' });
+      const friendlyError = formatErrorMessage(error, 'Stop-loss');
+      addBotMessage(friendlyError, 'error');
     }
   };
 
   const handleCheckPrices = async (parameters: any) => {
     const assets = parameters.asset ? [parameters.asset] : ['algorand', 'bitcoin', 'ethereum'];
+    const assetNames = assets.map(a => a === 'algorand' ? 'ALGO' : a.toUpperCase()).join(', ');
     
-    addBotMessage(`🔄 Fetching current prices for ${assets.join(', ')}...`, 'pending');
+    // Create a single message that will be updated - format for transaction details parsing
+    const messageId = addBotMessage(`Fetching current prices for ${assetNames}...`, 'pending');
     
     try {
       const prices = await tradingService.getPrices(assets);
       
       if (prices.length > 0) {
-        let priceMessage = '📊 Current Market Prices:\n\n';
-        prices.forEach(price => {
+        // Format message to include price information that can be parsed for transaction details
+        // Format: "Current Market Prices: ALGO: $0.1852 +2.94% Last updated: 10:33:55 PM"
+        let priceMessage = `Current Market Prices: `;
+        prices.forEach((price, index) => {
           const changeColor = price.change24h >= 0 ? '🟢' : '🔴';
-          priceMessage += `${price.symbol}: $${price.price.toFixed(4)} ${changeColor}${price.change24h >= 0 ? '+' : ''}${price.change24h.toFixed(2)}%\n`;
+          const changeSign = price.change24h >= 0 ? '+' : '';
+          priceMessage += `${price.symbol}: $${price.price.toFixed(4)} ${changeColor}${changeSign}${price.change24h.toFixed(2)}%`;
+          if (index < prices.length - 1) priceMessage += ', ';
         });
-        priceMessage += `\nLast updated: ${new Date().toLocaleTimeString()}`;
+        priceMessage += ` Last updated: ${new Date().toLocaleTimeString()}`;
         
-        addBotMessage(priceMessage, 'success');
-        enqueueSnackbar('Prices fetched successfully!', { variant: 'success' });
+        // Update the same message with success status
+        updateMessage(messageId, {
+          content: priceMessage,
+          status: 'success'
+        });
       } else {
-        addBotMessage('❌ Unable to fetch current prices. Please try again later.');
-        enqueueSnackbar('Failed to fetch prices', { variant: 'error' });
+        // Update the same message with error status
+        updateMessage(messageId, {
+          content: 'Unable to fetch current prices. Please try again later.',
+          status: 'error'
+        });
       }
     } catch (error) {
-      addBotMessage(`❌ Failed to fetch prices: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
-      enqueueSnackbar('Failed to fetch prices', { variant: 'error' });
+      // Update the same message with error status
+      const friendlyError = formatErrorMessage(error, 'Price fetch');
+      updateMessage(messageId, {
+        content: friendlyError,
+        status: 'error'
+      });
     }
   };
 
@@ -926,19 +1164,18 @@ const Index = () => {
                           }
                         });
                       }
-                      enqueueSnackbar('Swap completed successfully!', { variant: 'success' });
                       updateBalance();
                     }}
                     onSwapFailed={(data: any) => {
                       // Update the same message with error status
                       if (message.id) {
+                        const friendlyError = formatErrorMessage(data.error || 'Unknown error', 'Swap');
                         updateMessage(message.id, {
-                          content: `❌ Swap failed: ${data.error || 'Unknown error'}`,
+                          content: friendlyError,
                           status: 'error',
                           widgetParams: undefined // Hide widget after error
                         });
                       }
-                      enqueueSnackbar('Swap failed', { variant: 'error' });
                     }}
                   />
                 ))}
@@ -1000,13 +1237,13 @@ const Index = () => {
                       {[
                         "Send 10 ALGO to an address",
                         "Check my account balance", 
-                        "Create an ASA token",
-                        "Swap tokens",
+                        "Create an NFT",
+                        "Swap 10 ALGO to USDC",
                       ].map((prompt) => (
                         <Button
                           key={prompt}
                           variant="outline"
-                          className="h-auto py-3 px-4 text-sm font-normal hover:bg-muted hover:border-primary/50 transition-all bg-white rounded-md shadow-sm"
+                          className="h-auto py-3 px-2 sm:px-3 text-xs sm:text-sm font-normal hover:bg-muted hover:border-primary/50 transition-all bg-card rounded-md shadow-sm whitespace-normal break-words"
                           onClick={() => handleSelectPrompt(prompt)}
                         >
                           {prompt}
@@ -1023,6 +1260,8 @@ const Index = () => {
             disabled={isProcessing}
             onFileSelect={handleFileSelect}
             placeholder={pendingImage ? "Type 'create NFT' or your message..." : "Type your message here... (e.g., 'send 2 ALGO to K54ZTTHNDB...')"}
+            value={inputValue}
+            onValueChange={setInputValue}
           />
           <p className="text-[10px] sm:text-xs text-muted-foreground text-center mt-1.5 sm:mt-2">
             Algo Intent can make mistakes. Please verify transaction details.

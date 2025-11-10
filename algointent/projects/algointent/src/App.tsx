@@ -1,5 +1,4 @@
 import { SupportedWallet, WalletId, WalletManager, WalletProvider } from '@txnlab/use-wallet-react'
-import { SnackbarProvider } from 'notistack'
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -75,17 +74,15 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
         <TooltipProvider>
-          <SnackbarProvider maxSnack={3} style={{ zIndex: 9999999 }}>
-            <WalletProvider manager={walletManager}>
-              <SocialWalletProvider>
-                <Toaster />
-                <Sonner />
-                <BrowserRouter>
-                  <Layout />
-                </BrowserRouter>
-              </SocialWalletProvider>
-            </WalletProvider>
-          </SnackbarProvider>
+          <WalletProvider manager={walletManager}>
+            <SocialWalletProvider>
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <Layout />
+              </BrowserRouter>
+            </SocialWalletProvider>
+          </WalletProvider>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>
