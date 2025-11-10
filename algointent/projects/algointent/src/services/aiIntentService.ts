@@ -8,6 +8,7 @@ export interface IntentParameters {
   description?: string;
   image_url?: string;
   asset_id?: number;
+  asset_name?: string; // For asset names like USDC, USDT
   // Trading parameters
   from_asset?: string;
   to_asset?: string;
@@ -22,6 +23,11 @@ export interface ParsedIntent {
   intent: string;
   parameters: IntentParameters;
   context?: string;
+  explanation?: string;
+}
+
+export interface MultiIntent {
+  intents: ParsedIntent[];
   explanation?: string;
 }
 
@@ -56,7 +62,8 @@ INTENT TYPES:
 WALLET OPERATIONS:
 - "send_algo": Send ALGO to single recipient
 - "send_algo_multi": Send ALGO to multiple recipients
-- "create_nft": Create new NFT
+- "send_asset": Send any asset (USDC, USDT, etc.) to recipient (requires asset_id parameter)
+- "create_nft": Create new NFT (supply 1, decimals 0)
 - "create_nft_with_image": Create NFT with uploaded image
 - "send_nft": Send NFT to recipient
 - "opt_in": Opt-in to asset
@@ -169,6 +176,26 @@ User: "How do I create a smart contract?"
 User: "What's the weather like?"
 {"intent": "not_supported", "parameters": {}, "context": "User asking about weather", "explanation": "Sorry, I can only answer questions about Algorand, blockchain, trading, or digital assets."}
 
+NFT CREATION EXAMPLES:
+User: "Create an NFT named MyArt"
+{"intent": "create_nft", "parameters": {"name": "MyArt", "supply": 1}, "context": "User wants to create a single NFT"}
+
+User: "Create 10 NFTs with name flash predict"
+{"intent": "create_nft", "parameters": {"name": "flash predict", "supply": 10}, "context": "User wants to create 10 NFTs with the same name"}
+
+User: "Create 5 NFTs called CoolArt"
+{"intent": "create_nft", "parameters": {"name": "CoolArt", "supply": 5}, "context": "User wants to create 5 NFTs"}
+
+User: "Mint 100 NFTs named Collection"
+{"intent": "create_nft", "parameters": {"name": "Collection", "supply": 100}, "context": "User wants to create 100 NFTs"}
+
+IMPORTANT NFT RULES:
+- When user says "create X nfts" or "create X NFTs", extract the number X as the supply parameter
+- The supply parameter determines how many units of the NFT will be created (total supply)
+- If no quantity is specified, default supply is 1
+- For commands like "create 10 nfts with name X", extract both the name and supply (10)
+
+
 IMPORTANT RULES:
 1. Always provide helpful context and explanations
 2. If a feature isn't supported, explain why and suggest alternatives
@@ -178,10 +205,69 @@ IMPORTANT RULES:
 6. For swap requests, normalize token names to uppercase (ALGO, USDC, USDT, BTC, ETH)
 7. Handle various ways users might express swap intent: "swap", "convert", "exchange", "trade"
 
-IMPORTANT: Only output a single JSON object as your response. Do not include any explanation, markdown, or text outside the JSON.`;
+MULTI-INTENT SUPPORT:
+If the user requests multiple actions in a single message, return an array of intents:
+{
+  "intents": [
+    {"intent": "send_algo", "parameters": {"amount": 1, "recipient": "ADDRESS1"}},
+    {"intent": "opt_in", "parameters": {"asset_id": 123456}}
+  ],
+  "explanation": "I'll send 1 ALGO to ADDRESS1 and then opt-in to asset 123456"
+}
+
+Examples:
+User: "Send 1 ALGO to ABC123 and opt in for asset 456789"
+{
+  "intents": [
+    {"intent": "send_algo", "parameters": {"amount": 1, "recipient": "ABC123"}},
+    {"intent": "opt_in", "parameters": {"asset_id": 456789}}
+  ],
+  "explanation": "I'll send 1 ALGO to ABC123 and then opt-in to asset 456789"
+}
+
+User: "Send 2 ALGO to ADDR1, then opt in to asset 123, and check my balance"
+{
+  "intents": [
+    {"intent": "send_algo", "parameters": {"amount": 2, "recipient": "ADDR1"}},
+    {"intent": "opt_in", "parameters": {"asset_id": 123}},
+    {"intent": "balance", "parameters": {}}
+  ],
+  "explanation": "I'll send 2 ALGO to ADDR1, opt-in to asset 123, and check your balance"
+}
+
+User: "Send 1 ALGO and 1 USDC to ADDRESS"
+{
+  "intents": [
+    {"intent": "send_algo", "parameters": {"amount": 1, "recipient": "ADDRESS"}},
+    {"intent": "send_asset", "parameters": {"amount": 1, "recipient": "ADDRESS", "asset_id": 10458941, "asset_name": "USDC"}}
+  ],
+  "explanation": "I'll send 1 ALGO and 1 USDC to ADDRESS"
+}
+
+User: "Send 2 ALGO and 5 USDC to ABC123"
+{
+  "intents": [
+    {"intent": "send_algo", "parameters": {"amount": 2, "recipient": "ABC123"}},
+    {"intent": "send_asset", "parameters": {"amount": 5, "recipient": "ABC123", "asset_id": 10458941, "asset_name": "USDC"}}
+  ],
+  "explanation": "I'll send 2 ALGO and 5 USDC to ABC123"
+}
+
+ASSET IDS FOR TESTNET:
+- USDC: 10458941
+- USDT: 10458942
+- When user says "send USDC" or "send USDT", use send_asset intent with the appropriate asset_id
+- Always include asset_name parameter for clarity (e.g., "USDC", "USDT")
+- For multi-asset sends like "send 1 ALGO and 1 USDC", create separate intents for each asset
+
+IMPORTANT: 
+- If the user requests multiple actions, return an object with "intents" array
+- If the user requests a single action, return a single intent object (not wrapped in intents array)
+- Actions will be executed in the order specified
+- Only output a single JSON object as your response. Do not include any explanation, markdown, or text outside the JSON.`;
   }
 
-  async parseIntent(userInput: string): Promise<ParsedIntent | null> {
+  async parseIntent(userInput: string): Promise<ParsedIntent | MultiIntent | null> {
     if (!this.apiKey) {
       console.error('PERPLEXITY_API_KEY not found in environment variables');
       return null;
@@ -201,7 +287,7 @@ IMPORTANT: Only output a single JSON object as your response. Do not include any
             { role: 'user', content: userInput }
           ],
           temperature: 0.1,
-          max_tokens: 500
+          max_tokens: 1000 // Increased for multi-intent support
         })
       });
 
@@ -218,7 +304,7 @@ IMPORTANT: Only output a single JSON object as your response. Do not include any
     }
   }
 
-  private extractJson(text: string): ParsedIntent {
+  private extractJson(text: string): ParsedIntent | MultiIntent {
     try {
       const start = text.indexOf('{');
       const end = text.lastIndexOf('}') + 1;
@@ -226,7 +312,15 @@ IMPORTANT: Only output a single JSON object as your response. Do not include any
         throw new Error('No valid JSON block found in AI response');
       }
       const jsonStr = text.substring(start, end);
-      return JSON.parse(jsonStr);
+      const parsed = JSON.parse(jsonStr);
+      
+      // Check if it's a multi-intent response
+      if (parsed.intents && Array.isArray(parsed.intents)) {
+        return parsed as MultiIntent;
+      }
+      
+      // Otherwise, it's a single intent
+      return parsed as ParsedIntent;
     } catch (error) {
       console.error('JSON extraction error:', error, '\nAI response:', text);
       return { 
