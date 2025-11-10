@@ -57,12 +57,12 @@ export default function Landing() {
               no complex interfaces - just tell us what you want to do.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <a href="https://app.algointent.xyz" target="_self">
+              <Link to="/app">
                 <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-6 text-lg rounded-full shadow-lg hover:shadow-xl transition-all">
                   Get Started Free
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
-              </a>
+              </Link>
               <Link to="/features">
                 <Button size="lg" variant="outline" className="px-8 py-6 text-lg rounded-full">
                   Learn More
@@ -156,12 +156,12 @@ export default function Landing() {
                   </div>
                 ))}
               </div>
-              <a href="https://app.algointent.xyz" target="_self">
+              <Link to="/app">
                 <Button size="lg" className="mt-8 bg-primary hover:bg-primary/90 text-primary-foreground rounded-full">
                   Try It Now
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
-              </a>
+              </Link>
             </div>
             <div className="bg-gradient-to-br from-primary/10 to-accent/10 rounded-3xl p-8 border border-primary/20">
               <div className="space-y-4">
@@ -192,12 +192,12 @@ export default function Landing() {
           <p className="text-xl mb-10 text-white/90">
             Join thousands of users managing their Algorand assets with natural language
           </p>
-          <a href="https://app.algointent.xyz" target="_self">
+          <Link to="/app">
             <Button size="lg" variant="secondary" className="px-8 py-6 text-lg rounded-full">
               Launch Algo Intent
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
-          </a>
+          </Link>
         </div>
       </section>
     </div>
