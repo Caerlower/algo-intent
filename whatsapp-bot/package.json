@@ -1,0 +1,40 @@
+{
+  "name": "algointent-whatsapp-bot",
+  "version": "1.0.0",
+  "description": "WhatsApp bot for AlgoIntent - Web3 assistant for Algorand blockchain",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/index.ts",
+    "start": "node dist/index.js",
+    "watch": "ts-node-dev --respawn src/index.ts",
+    "test:redis": "ts-node src/scripts/test-redis.ts",
+    "get-wallet": "ts-node src/scripts/get-wallet.ts"
+  },
+  "keywords": [
+    "whatsapp",
+    "algorand",
+    "blockchain",
+    "web3"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "axios": "^1.6.2",
+    "body-parser": "^1.20.2",
+    "dotenv": "^16.3.1",
+    "bullmq": "^5.3.0",
+    "ioredis": "^5.3.2",
+    "algosdk": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.10.5",
+    "@types/body-parser": "^1.19.5",
+    "typescript": "^5.3.3",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0"
+  }
+}
+
