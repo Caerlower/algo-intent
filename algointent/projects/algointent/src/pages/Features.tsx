@@ -39,8 +39,8 @@ const features = [
     description: "Connect any Algorand-compatible wallet seamlessly. Switch between wallets with ease.",
     benefits: [
       "Pera Wallet integration",
-      "MyAlgo Wallet support",
       "Defly Wallet compatible",
+      "Social login support (Google)",
     ],
   },
   {
@@ -66,10 +66,10 @@ const features = [
   {
     icon: Lock,
     title: "Privacy First",
-    description: "We never store your private keys. Your wallet remains completely under your control.",
+    description: "We support multiple wallet options with different security models. Social login uses Hashi's semi-custodial architecture (non-custodial), while WalletConnect is custodial. Traditional wallets remain fully non-custodial.",
     benefits: [
-      "Non-custodial architecture",
-      "Zero data collection",
+      "Social login: Semi-custodial (Hashi non-custodial architecture)",
+      "Traditional wallets: Fully non-custodial",
       "Complete transparency",
     ],
   },

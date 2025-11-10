@@ -79,7 +79,7 @@ export default function Documentation() {
                       Connect Your Wallet
                     </h3>
                     <p className="text-muted-foreground ml-8">
-                      Click the "Connect Wallet" button in the top right corner. Select your preferred Algorand wallet (Pera, MyAlgo, or Defly) and authorize the connection.
+                      Click the "Connect Wallet" button in the top right corner. Select your preferred Algorand wallet (Pera or Defly) or use social login (Google) to connect. We support both traditional wallets and social login for seamless access.
                     </p>
                   </div>
 
