@@ -16,6 +16,7 @@ export interface NFTMetadata {
   url?: string;
 }
 
+
 const ALGOD_SERVER = 'https://testnet-api.algonode.cloud';
 const ALGOD_TOKEN = '';
 const ALGOD_PORT = '';
@@ -125,7 +126,7 @@ export async function sendAlgoMulti(
     return {
       status: 'success',
       txid: result.txIDs[0], // First transaction ID represents the group
-      message: `✅ Atomic multi-recipient transfer successful! ${recipients.length} payments sent atomically. Group TxID: ${result.txIDs[0]}`
+      message: `✅ Atomic multi-recipient transfer successful! ${recipients.length} payments sent atomically.`
     };
 
   } catch (error) {
@@ -247,7 +248,7 @@ export class TransactionService {
       return {
         status: 'success',
         txid: result.txIds[0],
-        message: `✅ Transaction successful! ${amount.toFixed(6)} ALGO sent to ${recipient}. TxID: ${result.txIds[0]}`
+        message: `✅ Transaction successful! ${amount.toFixed(6)} ALGO sent to ${recipient}. Transaction ID: ${result.txIds[0]}`
       };
 
     } catch (error) {
@@ -297,10 +298,11 @@ export class TransactionService {
         // Continue with success message even if opt-in fails
       }
 
+      const supplyText = metadata.totalSupply > 1 ? `${metadata.totalSupply} NFTs` : 'NFT';
       return {
         status: 'success',
         txid: result.txIds[0],
-        message: `✅ NFT created successfully! Asset ID: ${result.assetId}, Name: ${metadata.name}`
+        message: `✅ ${supplyText} created successfully! Asset ID: ${result.assetId}, Name: ${metadata.name}, Total Supply: ${metadata.totalSupply}`
       };
 
     } catch (error) {
@@ -403,6 +405,244 @@ export class TransactionService {
       return {
         status: 'error',
         message: `❌ Opt-out failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Execute multiple transactions atomically using AtomicTransactionComposer
+   * All transactions must succeed or all will fail
+   */
+  async executeAtomicTransactions(
+    sender: string,
+    transactions: Array<{
+      type: 'send_algo' | 'send_asset' | 'opt_in' | 'opt_out' | 'send_nft';
+      params: {
+        recipient?: string;
+        amount?: number;
+        assetId?: number;
+        assetName?: string; // For display purposes
+      };
+    }>,
+    signer: any
+  ): Promise<TransactionResult> {
+    try {
+      if (transactions.length === 0) {
+        return {
+          status: 'error',
+          message: '❌ No transactions to execute',
+          error: 'Empty transactions array'
+        };
+      }
+
+      // Get algod client
+      const algod = new algosdk.Algodv2(
+        this.algodConfig.token || '',
+        this.algodConfig.server,
+        this.algodConfig.port || ''
+      );
+
+      // Get suggested params once for all transactions
+      const suggestedParams = await algod.getTransactionParams().do();
+
+      // Create AtomicTransactionComposer
+      const atc = new algosdk.AtomicTransactionComposer();
+
+      // Build each transaction and add to composer
+      for (const txn of transactions) {
+        let transaction: algosdk.Transaction;
+
+        switch (txn.type) {
+          case 'send_algo':
+            if (!txn.params.recipient || txn.params.amount === undefined || txn.params.amount === null || isNaN(txn.params.amount)) {
+              return {
+                status: 'error',
+                message: '❌ Missing recipient or invalid amount for ALGO transfer',
+                error: 'Invalid parameters'
+              };
+            }
+            if (!this.isValidAddress(txn.params.recipient)) {
+              return {
+                status: 'error',
+                message: '❌ Invalid recipient address format',
+                error: 'Invalid address'
+              };
+            }
+            const algoAmount = Number(txn.params.amount);
+            if (isNaN(algoAmount) || algoAmount <= 0) {
+              return {
+                status: 'error',
+                message: '❌ Invalid amount for ALGO transfer',
+                error: 'Invalid amount'
+              };
+            }
+            transaction = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+              sender: sender,
+              receiver: txn.params.recipient,
+              amount: Math.floor(algoAmount * 1_000_000), // Convert to microALGO
+              suggestedParams,
+              note: new TextEncoder().encode(`Atomic transfer: ${algoAmount} ALGO to ${txn.params.recipient}`)
+            });
+            break;
+
+          case 'send_asset':
+            if (!txn.params.recipient || txn.params.amount === undefined || txn.params.amount === null || isNaN(txn.params.amount) || !txn.params.assetId) {
+              return {
+                status: 'error',
+                message: '❌ Missing recipient, amount, or asset ID for asset transfer',
+                error: 'Invalid parameters'
+              };
+            }
+            if (!this.isValidAddress(txn.params.recipient)) {
+              return {
+                status: 'error',
+                message: '❌ Invalid recipient address format',
+                error: 'Invalid address'
+              };
+            }
+            const assetAmount = Number(txn.params.amount);
+            if (isNaN(assetAmount) || assetAmount <= 0) {
+              return {
+                status: 'error',
+                message: '❌ Invalid amount for asset transfer',
+                error: 'Invalid amount'
+              };
+            }
+            // Get asset info to determine decimals
+            let decimals = 0;
+            try {
+              const assetInfo = await algod.getAssetByID(txn.params.assetId).do();
+              decimals = assetInfo.params?.decimals || 0;
+            } catch (error) {
+              console.warn(`Could not fetch asset info for ${txn.params.assetId}, using default decimals:`, error);
+              // Default to 6 decimals for most assets (USDC, USDT, etc.)
+              decimals = 6;
+            }
+            const assetAmountMicro = Math.floor(assetAmount * Math.pow(10, decimals));
+            
+            transaction = algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
+              sender: sender,
+              receiver: txn.params.recipient,
+              amount: assetAmountMicro,
+              assetIndex: txn.params.assetId,
+              suggestedParams,
+              note: new TextEncoder().encode(`Atomic transfer: ${assetAmount} ${txn.params.assetName || `Asset ${txn.params.assetId}`} to ${txn.params.recipient}`)
+            });
+            break;
+
+          case 'opt_in':
+            if (!txn.params.assetId) {
+              return {
+                status: 'error',
+                message: '❌ Missing asset ID for opt-in',
+                error: 'Invalid parameters'
+              };
+            }
+            transaction = algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
+              sender: sender,
+              receiver: sender, // Opt-in: sender sends to themselves
+              amount: 0,
+              assetIndex: txn.params.assetId,
+              suggestedParams,
+              note: new TextEncoder().encode(`Atomic opt-in to asset ${txn.params.assetId}`)
+            });
+            break;
+
+          case 'opt_out':
+            if (!txn.params.assetId) {
+              return {
+                status: 'error',
+                message: '❌ Missing asset ID for opt-out',
+                error: 'Invalid parameters'
+              };
+            }
+            // Opt-out: send to zero address with closeRemainderTo
+            const zeroAddress = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAY5HFKQ';
+            transaction = algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
+              sender: sender,
+              receiver: zeroAddress,
+              amount: 0,
+              assetIndex: txn.params.assetId,
+              closeRemainderTo: zeroAddress,
+              suggestedParams,
+              note: new TextEncoder().encode(`Atomic opt-out from asset ${txn.params.assetId}`)
+            });
+            break;
+
+          case 'send_nft':
+            if (!txn.params.recipient || !txn.params.assetId) {
+              return {
+                status: 'error',
+                message: '❌ Missing recipient or asset ID for NFT transfer',
+                error: 'Invalid parameters'
+              };
+            }
+            if (!this.isValidAddress(txn.params.recipient)) {
+              return {
+                status: 'error',
+                message: '❌ Invalid recipient address format',
+                error: 'Invalid address'
+              };
+            }
+            transaction = algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
+              sender: sender,
+              receiver: txn.params.recipient,
+              amount: 1, // NFTs have amount 1
+              assetIndex: txn.params.assetId,
+              suggestedParams,
+              note: new TextEncoder().encode(`Atomic NFT transfer: asset ${txn.params.assetId} to ${txn.params.recipient}`)
+            });
+            break;
+
+          default:
+            return {
+              status: 'error',
+              message: `❌ Unsupported transaction type: ${(txn as any).type}`,
+              error: 'Unsupported type'
+            };
+        }
+
+        // Add transaction to atomic composer
+        atc.addTransaction({
+          txn: transaction,
+          signer: signer
+        });
+      }
+
+      // Execute the atomic group
+      const result = await atc.execute(algod, 5);
+
+      // Build success message
+      const actionDescriptions = transactions.map(txn => {
+        switch (txn.type) {
+          case 'send_algo':
+            return `sent ${txn.params.amount} ALGO to ${txn.params.recipient?.substring(0, 6)}...${txn.params.recipient?.substring(txn.params.recipient.length - 4)}`;
+          case 'send_asset':
+            const assetName = txn.params.assetName || `Asset ${txn.params.assetId}`;
+            return `sent ${txn.params.amount} ${assetName} to ${txn.params.recipient?.substring(0, 6)}...${txn.params.recipient?.substring(txn.params.recipient.length - 4)}`;
+          case 'opt_in':
+            return `opted in to asset ${txn.params.assetId}`;
+          case 'opt_out':
+            return `opted out of asset ${txn.params.assetId}`;
+          case 'send_nft':
+            return `sent NFT ${txn.params.assetId} to ${txn.params.recipient?.substring(0, 6)}...${txn.params.recipient?.substring(txn.params.recipient.length - 4)}`;
+          default:
+            return 'completed action';
+        }
+      }).join(', ');
+
+      return {
+        status: 'success',
+        txid: result.txIDs[0], // First transaction ID represents the group
+        message: `✅ Atomic transaction successful! ${actionDescriptions}.`
+      };
+
+    } catch (error) {
+      console.error('Atomic transaction error:', error);
+      return {
+        status: 'error',
+        message: `❌ Atomic transaction failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
