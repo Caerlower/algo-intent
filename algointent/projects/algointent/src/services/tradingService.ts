@@ -327,7 +327,7 @@ export class TradingService {
       return {
         status: 'success',
         txid: result.txnID,
-        message: `✅ Tinyman swap successful! ${amount} ${fromAsset} → ${outputAmount} ${toAsset}. TxID: ${result.txnID}`,
+        message: `✅ Tinyman swap successful! ${amount} ${fromAsset} → ${outputAmount} ${toAsset}. Transaction ID: ${result.txnID}`,
         data: quote
       };
     } catch (error: any) {
