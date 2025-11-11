@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { MainnetWarning } from "@/components/MainnetWarning";
 import Index from "./pages/Index";
 import Landing from "./pages/Landing";
 import Features from "./pages/Features";
@@ -15,6 +16,7 @@ import About from "./pages/About";
 import NotFound from "./pages/NotFound";
 import { getAlgodConfigFromViteEnvironment } from './utils/network/getAlgoClientConfigs'
 import { SocialWalletProvider } from './providers/EnhancedWalletProvider'
+import { NetworkProvider } from './providers/NetworkProvider'
 
 const queryClient = new QueryClient();
 
@@ -36,10 +38,10 @@ function Layout() {
       {!isAppRoute && <Navbar />}
       
       <Routes>
-        <Route path="/" element={<Landing />} />
-        <Route path="/features" element={<Features />} />
-        <Route path="/documentation" element={<Documentation />} />
-        <Route path="/about" element={<About />} />
+        <Route path="/" element={<><MainnetWarning /><Landing /></>} />
+        <Route path="/features" element={<><MainnetWarning /><Features /></>} />
+        <Route path="/documentation" element={<><MainnetWarning /><Documentation /></>} />
+        <Route path="/about" element={<><MainnetWarning /><About /></>} />
         <Route path="/app" element={<Index />} />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />
@@ -73,17 +75,19 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
-        <TooltipProvider>
-          <WalletProvider manager={walletManager}>
-            <SocialWalletProvider>
-              <Toaster />
-              <Sonner />
-              <BrowserRouter>
-                <Layout />
-              </BrowserRouter>
-            </SocialWalletProvider>
-          </WalletProvider>
-        </TooltipProvider>
+        <NetworkProvider>
+          <TooltipProvider>
+            <WalletProvider manager={walletManager}>
+              <SocialWalletProvider>
+                <Toaster />
+                <Sonner />
+                <BrowserRouter>
+                  <Layout />
+                </BrowserRouter>
+              </SocialWalletProvider>
+            </WalletProvider>
+          </TooltipProvider>
+        </NetworkProvider>
       </ThemeProvider>
     </QueryClientProvider>
   )

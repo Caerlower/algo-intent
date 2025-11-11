@@ -3,11 +3,14 @@ import { Moon, Sun, Menu, X } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useState } from "react";
 import { useTheme } from "next-themes";
+import { NetworkToggle } from "@/components/NetworkToggle";
+import { useNetwork } from "@/providers/NetworkProvider";
 
 export const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
   const { theme, setTheme } = useTheme();
+  const { isMainnet } = useNetwork();
 
   const toggleTheme = () => {
     setTheme(theme === "dark" ? "light" : "dark");
@@ -51,6 +54,7 @@ export const Navbar = () => {
 
           {/* Actions */}
           <div className="flex items-center gap-2">
+            <NetworkToggle />
             <Button
               variant="ghost"
               size="icon"
