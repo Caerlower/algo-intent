@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { useNetwork } from "@/providers/NetworkProvider";
 import SwapWidget from "./SwapWidget";
 
 interface ChatMessageProps {
@@ -214,6 +215,7 @@ const parseTransactionDetails = (content: string, widgetParams?: { fromAsset?: s
 };
 
 const ChatMessage = ({ role, content, status, txid, imageUrl, isPendingImage, widgetParams, onSwapCompleted, onSwapFailed }: ChatMessageProps) => {
+  const { network } = useNetwork();
   const transactionDetails = role === "assistant" ? parseTransactionDetails(content, widgetParams) : null;
   const isSwap = transactionDetails?.fromAmount && transactionDetails?.toAmount;
   const isBalanceCheck = transactionDetails?.balance !== undefined || transactionDetails?.assets !== undefined;
@@ -508,7 +510,7 @@ const ChatMessage = ({ role, content, status, txid, imageUrl, isPendingImage, wi
                     <div className="text-sm sm:text-base text-muted-foreground">
                       <span className="text-muted-foreground">Transaction ID: </span>
                       <a 
-                        href={`https://lora.algokit.io/testnet/transaction/${txid}`} 
+                        href={`https://lora.algokit.io/${network}/transaction/${txid}`} 
                         target="_blank" 
                         rel="noopener noreferrer" 
                         className="text-primary underline hover:text-primary/80 font-mono"
