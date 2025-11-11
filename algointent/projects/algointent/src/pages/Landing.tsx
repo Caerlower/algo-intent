@@ -42,8 +42,12 @@ export default function Landing() {
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-accent/5 to-background -z-10" />
         <div className="container mx-auto max-w-6xl">
           <div className="text-center mb-16 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-primary to-accent mb-8 shadow-lg">
-              <span className="text-white font-bold text-3xl">A</span>
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-primary to-accent mb-8 shadow-lg overflow-hidden">
+              <img 
+                src="/logo.png" 
+                alt="Algo Intent Logo" 
+                className="w-full h-full object-cover"
+              />
             </div>
             <h1 className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
               Algorand Transactions

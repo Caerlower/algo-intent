@@ -1022,8 +1022,12 @@ const Index = () => {
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-16">
             <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                <span className="text-white font-bold text-sm">A</span>
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center overflow-hidden">
+                <img 
+                  src="/logo.png" 
+                  alt="Algo Intent Logo" 
+                  className="w-full h-full object-cover"
+                />
               </div>
               <span className="font-semibold text-lg">Algo Intent</span>
             </Link>

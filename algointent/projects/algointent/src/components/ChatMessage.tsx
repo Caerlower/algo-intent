@@ -279,8 +279,14 @@ const ChatMessage = ({ role, content, status, txid, imageUrl, isPendingImage, wi
               }}
             />
             <div 
-              className="absolute inset-0.5 sm:inset-1 rounded-full bg-white/30 backdrop-blur-sm"
-            />
+              className="absolute inset-0.5 sm:inset-1 rounded-full bg-white/30 backdrop-blur-sm flex items-center justify-center overflow-hidden"
+            >
+              <img 
+                src="/logo.png" 
+                alt="Algo Intent Logo" 
+                className="w-full h-full object-cover"
+              />
+            </div>
           </div>
         </div>
       )}
