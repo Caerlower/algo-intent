@@ -174,7 +174,7 @@ npm start
 
 ### Wallet Operations
 - ✅ Send ALGO to single or multiple recipients
-- ✅ Send assets (USDC, USDT, etc.) to recipients
+- ✅ Send assets (USDC, etc.) to recipients
 - ✅ Check wallet balance
 - ✅ Create and manage wallets
 - ✅ Connect/disconnect wallets
@@ -204,9 +204,9 @@ npm start
 
 | Asset | Symbol | Asset ID | Explorer Link |
 |-------|--------|----------|---------------|
-| Algorand | ALGO | 0 | [View on Explorer](https://testnet.explorer.perawallet.app/) |
-| USD Coin | USDC | 10458941 | [View Asset](https://testnet.explorer.perawallet.app/asset/10458941) |
-| TinyUSDC | TINYUSDC | 21582668 | [View Asset](https://testnet.explorer.perawallet.app/asset/21582668) |
+| Algorand | ALGO | 0 | [View on Explorer](https://lora.algokit.io/testnet/) |
+| USD Coin | USDC | 10458941 | [View Asset](https://lora.algokit.io/testnet/asset/10458941) |
+| TinyUSDC | TINYUSDC | 21582668 | [View Asset](https://lora.algokit.io/testnet/asset/21582668) |
 
 ### Smart Contracts
 
@@ -218,8 +218,8 @@ AlgoIntent uses the following Algorand protocols:
 
 ### Network Information
 
-- **Testnet Explorer**: [https://testnet.explorer.perawallet.app/](https://testnet.explorer.perawallet.app/)
-- **Mainnet Explorer**: [https://explorer.perawallet.app/](https://explorer.perawallet.app/)
+- **Testnet Explorer**: [https://lora.algokit.io/testnet/](https://lora.algokit.io/testnet/)
+- **Mainnet Explorer**: [https://lora.algokit.io/mainnet/](https://lora.algokit.io/mainnet/)
 - **Algorand Testnet Faucet**: [https://bank.testnet.algorand.network/](https://bank.testnet.algorand.network/)
 
 ---
@@ -243,9 +243,9 @@ Visit [https://www.algointent.xyz/app](https://www.algointent.xyz/app) and try:
 
 ```
 create me a new wallet
-send 5 algos to K54ZTTHNDB567Q5J5T73CEJCT3Z3MB6VL35PJBIX57KGRWNGZZLH3BK7S4
+send 5 algos to RUXSTPANLEGZY5BDDA3SWRSG5JME67UYXII65XXI6GSY3HCQRSWMAPKCKY
 Create 10 nfts with name Universe and description "This image shows our milky way"
-send 2 algos to both K54ZTTHNDB567Q5J5T73CEJCT3Z3MB6VL35PJBIX57KGRWNGZZLH3BK7S4 and 6MZK4765UUZFBPAPXZBNXTIRHORJ75KBKRIGHVOB23OQODVMSB6GCL5DVM
+send 2 algos to both RUXSTPANLEGZY5BDDA3SWRSG5JME67UYXII65XXI6GSY3HCQRSWMAPKCKY and 6MZK4765UUZFBPAPXZBNXTIRHORJ75KBKRIGHVOB23OQODVMSB6GCL5DVM
 Opt in for NFT 740574628
 ```
 
@@ -268,12 +268,14 @@ Opt-in ASA 12345
 - **Routing**: React Router DOM
 - **State Management**: React Hooks + TanStack Query
 - **Wallet Integration**: `@txnlab/use-wallet-react`
+- **Social Login**: Google OAuth with HashiCorp Vault backend for secure key management
 - **Algorand SDK**: `algosdk` + `@algorandfoundation/algokit-utils`
 - **Trading**: `@tinymanorg/tinyman-swap-widget-sdk`
 
 ### Backend Services
 - **AI Intent Parsing**: Perplexity AI API
 - **IPFS Storage**: Pinata API
+- **Social Login Backend**: HashiCorp Vault API for secure wallet key storage and transaction signing
 - **Blockchain**: Algorand Testnet/Mainnet
 - **DEX Integration**: Tinyman v2
 
@@ -339,8 +341,8 @@ algo-intent/
 
 | Network | Status | Explorer | Notes |
 |---------|--------|----------|-------|
-| **Testnet** | ✅ Fully Supported | [testnet.explorer.perawallet.app](https://testnet.explorer.perawallet.app/) | Recommended for testing |
-| **Mainnet** | ⚠️ Beta | [explorer.perawallet.app](https://explorer.perawallet.app/) | Use with caution |
+| **Testnet** | ✅ Fully Supported | [lora.algokit.io/testnet](https://lora.algokit.io/testnet/) | Recommended for testing |
+| **Mainnet** | ⚠️ Beta | [lora.algokit.io/mainnet](https://lora.algokit.io/mainnet/) | Use with caution |
 
 ---
 
@@ -407,7 +409,6 @@ A: Yes! The Telegram bot supports creating NFTs with custom names, descriptions,
 
 ## 🎥 Demo
 
-- **YouTube Demo**: [https://youtu.be/gwnjztTM3wI](https://youtu.be/gwnjztTM3wI)
 - **Live Web App**: [https://www.algointent.xyz/](https://www.algointent.xyz/)
 
 ---
