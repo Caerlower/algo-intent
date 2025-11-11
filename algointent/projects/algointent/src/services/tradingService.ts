@@ -48,19 +48,45 @@ const COINGECKO_IDS: Record<string, string> = {
 
 const TINYUSDC_ID = 21582668; // Testnet TinyUSDC ASA ID
 
-// Testnet asset IDs
+// Network-specific asset IDs
 const TESTNET_ASA_IDS: Record<string, number> = {
   'ALGO': 0,
   'USDC': 10458941 // Real USDC on testnet
 };
 
-function resolveTestnetAssetId(symbolOrId: string): number {
+const MAINNET_ASA_IDS: Record<string, number> = {
+  'ALGO': 0,
+  'USDC': 31566704 // Real USDC on mainnet
+};
+
+function resolveAssetId(symbolOrId: string, network: 'testnet' | 'mainnet'): number {
+  // If it's already a numeric ID, return it
   if (/^\d+$/.test(symbolOrId)) return Number(symbolOrId);
-  return TESTNET_ASA_IDS[symbolOrId.toUpperCase()] ?? Number(symbolOrId);
+  
+  // Get the appropriate asset ID map based on network
+  const assetMap = network === 'mainnet' ? MAINNET_ASA_IDS : TESTNET_ASA_IDS;
+  const symbolUpper = symbolOrId.toUpperCase();
+  
+  // Return mapped asset ID or try to parse as number
+  return assetMap[symbolUpper] ?? Number(symbolOrId);
 }
 
 const { poolUtils, SwapType, Swap } = tinyman;
-const algodClient = new algosdk.Algodv2('', 'https://testnet-api.algonode.cloud', '');
+
+// Helper function to create algod client from config
+function createAlgodClient(algodConfig: any): algosdk.Algodv2 {
+  return new algosdk.Algodv2(
+    algodConfig.token || '',
+    algodConfig.server,
+    algodConfig.port || ''
+  );
+}
+
+// Helper function to get network string from config
+function getNetworkFromConfig(algodConfig: any): 'testnet' | 'mainnet' {
+  const network = algodConfig.network?.toLowerCase();
+  return network === 'mainnet' ? 'mainnet' : 'testnet';
+}
 
 // Tinyman-compatible signer for use-wallet-react
 export async function tinymanSigner(txns: any[], signTransactions: (txns: Uint8Array[]) => Promise<(Uint8Array | null)[]>) {
@@ -89,10 +115,17 @@ export async function tinymanSigner(txns: any[], signTransactions: (txns: Uint8A
 export class TradingService {
   private apiKey: string;
   private baseUrl: string;
+  private algodConfig: any;
 
-  constructor() {
+  constructor(algodConfig?: any) {
     this.apiKey = import.meta.env.VITE_COINGECKO_API_KEY || '';
     this.baseUrl = 'https://api.coingecko.com/api/v3';
+    this.algodConfig = algodConfig;
+  }
+
+  // Update algod config (for when network changes)
+  updateConfig(algodConfig: any) {
+    this.algodConfig = algodConfig;
   }
 
   // Get current market prices
@@ -234,11 +267,23 @@ export class TradingService {
     amount: number,
     signer: any,
     sender: string,
-    signTransactions?: (txns: Uint8Array[]) => Promise<(Uint8Array | null)[]>
+    signTransactions?: (txns: Uint8Array[]) => Promise<(Uint8Array | null)[]>,
+    algodConfig?: any
   ): Promise<TradingResult> {
     try {
-      const assetInId = resolveTestnetAssetId(fromAsset);
-      const assetOutId = resolveTestnetAssetId(toAsset);
+      if (!this.algodConfig && !algodConfig) {
+        return {
+          status: 'error',
+          message: '❌ Algod configuration is required for swap execution.',
+          error: 'Missing config'
+        };
+      }
+      const config = algodConfig || this.algodConfig;
+      const algodClient = createAlgodClient(config);
+      const network = getNetworkFromConfig(config);
+
+      const assetInId = resolveAssetId(fromAsset, network);
+      const assetOutId = resolveAssetId(toAsset, network);
       console.log('Tinyman swap asset IDs:', { assetInId, assetOutId });
       if (isNaN(assetInId) || isNaN(assetOutId)) {
         return {
@@ -248,8 +293,8 @@ export class TradingService {
         };
       }
       // Fetch decimals for both assets (ALGO is always 6)
-      const assetInDecimals = assetInId === 0 ? 6 : await this.getAssetDecimals(assetInId);
-      const assetOutDecimals = assetOutId === 0 ? 6 : await this.getAssetDecimals(assetOutId);
+      const assetInDecimals = assetInId === 0 ? 6 : await this.getAssetDecimals(assetInId, config);
+      const assetOutDecimals = assetOutId === 0 ? 6 : await this.getAssetDecimals(assetOutId, config);
       const assetIn = { id: assetInId, decimals: assetInDecimals };
       const assetOut = { id: assetOutId, decimals: assetOutDecimals };
       const assetInAmount = { ...assetIn, amount: BigInt(Math.floor(amount * 10 ** assetInDecimals)) };
@@ -258,7 +303,7 @@ export class TradingService {
       // 1. Fetch pool (Tinyman SDK)
       const pool = await poolUtils.v2.getPoolInfo({
         client: algodClient,
-        network: 'testnet',
+        network: network,
         asset1ID: assetIn.id,
         asset2ID: assetOut.id
       });
@@ -266,7 +311,7 @@ export class TradingService {
       if (!pool) {
         return {
           status: 'error',
-          message: '❌ Could not find Tinyman pool for this asset pair on testnet.',
+          message: `❌ Could not find Tinyman pool for this asset pair on ${network}.`,
           error: 'No pool'
         };
       }
@@ -278,7 +323,7 @@ export class TradingService {
         assetIn,
         assetOut,
         pool,
-        network: 'testnet',
+        network: network,
         slippage: 0.01
       });
       console.log('Tinyman quote:', quote);
@@ -293,7 +338,7 @@ export class TradingService {
       // 3. Generate transactions (Tinyman SDK)
       const txns = await Swap.v2.generateTxns({
         client: algodClient,
-        network: 'testnet',
+        network: network,
         quote,
         swapType: SwapType.FixedInput,
         slippage: 0.01,
@@ -341,10 +386,14 @@ export class TradingService {
   }
 
   // Helper to fetch decimals for an ASA
-  async getAssetDecimals(assetId: number): Promise<number> {
+  async getAssetDecimals(assetId: number, algodConfig?: any): Promise<number> {
     if (assetId === 0) return 6;
+    const config = algodConfig || this.algodConfig;
+    if (!config) {
+      throw new Error('Algod configuration is required to fetch asset decimals');
+    }
     // Use Algorand Indexer or Algod to fetch asset params
-    const algod = new algosdk.Algodv2('', 'https://testnet-api.algonode.cloud', '');
+    const algod = createAlgodClient(config);
     const assetInfo = await algod.getAssetByID(assetId).do();
     return assetInfo.params.decimals;
   }
@@ -446,6 +495,4 @@ export class TradingService {
       };
     }
   }
-}
-
-export const tradingService = new TradingService(); 
+} 
