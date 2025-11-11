@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useEnhancedWallet } from '../providers/EnhancedWalletProvider';
+import { useNetwork } from '../providers/NetworkProvider';
+import { getAlgodConfigForNetwork } from '../utils/network/getAlgoClientConfigs';
 import { ellipseAddress } from '../utils/ellipseAddress';
 import ConnectWallet from './ConnectWallet';
 import { Button } from '@/components/ui/button';
@@ -10,17 +12,22 @@ import { toast } from 'sonner';
 
 const WalletConnectButton: React.FC = () => {
   const { wallets, activeAddress, isGoogleConnected, googleUser, googleWallet, disconnectGoogleWallet } = useEnhancedWallet();
+  const { network } = useNetwork();
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
   const [balance, setBalance] = useState<{ algo: number; assets: any[] } | null>(null);
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   const [showBalanceType, setShowBalanceType] = useState<'available' | 'total'>('available');
   const [isBalanceDropdownOpen, setIsBalanceDropdownOpen] = useState(false);
 
-  const transactionService = new TransactionService({
-    server: 'https://testnet-api.algonode.cloud',
-    token: '',
-    port: ''
-  });
+  // Get algod config based on selected network
+  const algodConfig = useMemo(() => {
+    return getAlgodConfigForNetwork(network);
+  }, [network]);
+
+  // Create transaction service with network-aware config
+  const transactionService = useMemo(() => {
+    return new TransactionService(algodConfig);
+  }, [algodConfig]);
 
   useEffect(() => {
     if (activeAddress) {
@@ -29,7 +36,7 @@ const WalletConnectButton: React.FC = () => {
       setBalance(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeAddress]);
+  }, [activeAddress, network]);
 
   const fetchBalance = async () => {
     if (!activeAddress) return;
