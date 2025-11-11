@@ -16,14 +16,9 @@ export interface NFTMetadata {
   url?: string;
 }
 
-
-const ALGOD_SERVER = 'https://testnet-api.algonode.cloud';
-const ALGOD_TOKEN = '';
-const ALGOD_PORT = '';
-
-export async function getAccountBalance(address: string): Promise<{ algo: number; assets: any[] }> {
+export async function getAccountBalance(address: string, algodConfig: any): Promise<{ algo: number; assets: any[] }> {
   if (!algosdk.isValidAddress(address)) throw new Error('Invalid Algorand address');
-  const algod = new algosdk.Algodv2(ALGOD_TOKEN, ALGOD_SERVER, ALGOD_PORT);
+  const algod = new algosdk.Algodv2(algodConfig.token || '', algodConfig.server, algodConfig.port || '');
   const info = await algod.accountInformation(address).do();
   return {
     algo: Number(info.amount) / 1_000_000,
@@ -31,9 +26,9 @@ export async function getAccountBalance(address: string): Promise<{ algo: number
   };
 }
 
-export async function sendAlgo(sender: string, recipient: string, amount: number, signer: any) {
+export async function sendAlgo(sender: string, recipient: string, amount: number, signer: any, algodConfig: any) {
   if (!algosdk.isValidAddress(sender) || !algosdk.isValidAddress(recipient)) throw new Error('Invalid address');
-  const algod = new algosdk.Algodv2(ALGOD_TOKEN, ALGOD_SERVER, ALGOD_PORT);
+  const algod = new algosdk.Algodv2(algodConfig.token || '', algodConfig.server, algodConfig.port || '');
   const params = await algod.getTransactionParams().do();
   const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
     from: sender,
@@ -47,102 +42,11 @@ export async function sendAlgo(sender: string, recipient: string, amount: number
   return txid.txid;
 }
 
-// NOTE: This implementation is NOT compatible with most wallet connectors (Pera, Defly, etc.)
-// because it uses AtomicTransactionComposer and expects a custom group signer.
-// Use the direct frontend implementation for multi-send instead.
-/*
-export async function sendAlgoMulti(
-  sender: string,
-  recipients: Array<{ address: string; amount: number }>,
-  signer: any
-): Promise<TransactionResult> {
-  try {
-    if (recipients.length < 2) {
-      return {
-        status: 'error',
-        message: '❌ Multi-recipient transfer requires at least 2 recipients.',
-        error: 'Invalid recipients'
-      };
-    }
 
-    // Validate all recipients
-    for (let i = 0; i < recipients.length; i++) {
-      const recipient = recipients[i];
-      if (!algosdk.isValidAddress(recipient.address)) {
-        return {
-          status: 'error',
-          message: `❌ Invalid recipient address #${i + 1}`,
-          error: 'Invalid address'
-        };
-      }
-      if (recipient.amount <= 0) {
-        return {
-          status: 'error',
-          message: `❌ Invalid amount for recipient #${i + 1}`,
-          error: 'Invalid amount'
-        };
-      }
-    }
 
-    // Use algokit-utils AtomicTransactionComposer for proper group handling
-    const atc = new algosdk.AtomicTransactionComposer();
-    
-    // Get algod client from stored configuration
-    const algod = new algosdk.Algodv2(
-      ALGOD_TOKEN,
-      ALGOD_SERVER,
-      ALGOD_PORT
-    );
-    
-    // Add each payment transaction to the composer
-    for (const recipient of recipients) {
-      const suggestedParams = await algod.getTransactionParams().do();
-      // Detailed debug log
-      console.log('Building txn:', {
-        from: sender,
-        fromValid: algosdk.isValidAddress(sender),
-        to: recipient.address,
-        toValid: algosdk.isValidAddress(recipient.address),
-        amount: Math.floor(recipient.amount * 1_000_000),
-        suggestedParams
-      });
-      const paymentTxn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-        from: sender,
-        to: recipient.address,
-        amount: Math.floor(recipient.amount * 1_000_000),
-        suggestedParams,
-        note: new TextEncoder().encode(`Multi-recipient transfer to ${recipient.address}`)
-      } as any);
-      
-      atc.addTransaction({
-        txn: paymentTxn,
-        signer: signer
-      });
-    }
-
-    // Execute the atomic group
-    const result = await atc.execute(algod, 5);
-
-    return {
-      status: 'success',
-      txid: result.txIDs[0], // First transaction ID represents the group
-      message: `✅ Atomic multi-recipient transfer successful! ${recipients.length} payments sent atomically.`
-    };
-
-  } catch (error) {
-    console.error('Atomic group error:', error);
-    return {
-      status: 'error',
-      message: `❌ Atomic multi-recipient transfer failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    };
-  }
-}
-*/
-
-export async function createNFT(sender: string, metadata: { name: string; unitName: string; totalSupply: number; description?: string; url?: string }, signer: any) {
+export async function createNFT(sender: string, metadata: { name: string; unitName: string; totalSupply: number; description?: string; url?: string }, signer: any, algodConfig: any) {
   if (!algosdk.isValidAddress(sender)) throw new Error('Invalid sender address');
-  const algod = new algosdk.Algodv2(ALGOD_TOKEN, ALGOD_SERVER, ALGOD_PORT);
+  const algod = new algosdk.Algodv2(algodConfig.token || '', algodConfig.server, algodConfig.port || '');
   const params = await algod.getTransactionParams().do();
   const txn = algosdk.makeAssetCreateTxnWithSuggestedParamsFromObject({
     from: sender,
@@ -164,13 +68,13 @@ export async function createNFT(sender: string, metadata: { name: string; unitNa
   const assetId = confirmed['assetIndex'];
   if (typeof assetId !== 'number') throw new Error('Failed to get assetId after NFT creation');
   // Auto-opt-in after creation
-  await optInToAsset(sender, assetId, signer);
+  await optInToAsset(sender, assetId, signer, algodConfig);
   return { txid: txid.txid, assetId };
 }
 
-export async function optInToAsset(address: string, assetId: number, signer: any) {
+export async function optInToAsset(address: string, assetId: number, signer: any, algodConfig: any) {
   if (!algosdk.isValidAddress(address)) throw new Error('Invalid address');
-  const algod = new algosdk.Algodv2(ALGOD_TOKEN, ALGOD_SERVER, ALGOD_PORT);
+  const algod = new algosdk.Algodv2(algodConfig.token || '', algodConfig.server, algodConfig.port || '');
   const params = await algod.getTransactionParams().do();
   const txn = algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
     from: address,
