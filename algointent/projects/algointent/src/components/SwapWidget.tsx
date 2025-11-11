@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useWallet } from '@txnlab/use-wallet-react';
 import { TradingService } from '../services/tradingService';
+import { useNetwork } from '../providers/NetworkProvider';
+import { getAlgodConfigForNetwork } from '../utils/network/getAlgoClientConfigs';
 import { cn } from "@/lib/utils";
 
 interface SwapWidgetProps {
@@ -11,17 +13,34 @@ interface SwapWidgetProps {
   onSwapFailed?: (error: any) => void;
 }
 
+// Network-specific asset configurations
 const TESTNET_ASSETS = [
   { symbol: 'ALGO', id: 0, decimals: 6, name: 'Algorand', icon: 'https://cryptologos.cc/logos/algorand-algo-logo.png?v=026' },
   { symbol: 'USDC', id: 10458941, decimals: 6, name: 'USDC', icon: 'https://cryptologos.cc/logos/usd-coin-usdc-logo.png?v=026' },
 ];
 
-const getAssetMeta = (symbol: string) => TESTNET_ASSETS.find(a => a.symbol === symbol) || TESTNET_ASSETS[0];
+const MAINNET_ASSETS = [
+  { symbol: 'ALGO', id: 0, decimals: 6, name: 'Algorand', icon: 'https://cryptologos.cc/logos/algorand-algo-logo.png?v=026' },
+  { symbol: 'USDC', id: 31566704, decimals: 6, name: 'USDC', icon: 'https://cryptologos.cc/logos/usd-coin-usdc-logo.png?v=026' },
+];
 
-const tradingService = new TradingService();
+const getAssetMeta = (symbol: string, network: 'testnet' | 'mainnet') => {
+  const assets = network === 'mainnet' ? MAINNET_ASSETS : TESTNET_ASSETS;
+  return assets.find(a => a.symbol === symbol) || assets[0];
+};
 
 const SwapWidget: React.FC<SwapWidgetProps> = ({ fromAsset, toAsset, amount, onSwapCompleted, onSwapFailed }) => {
   const { activeAddress, signTransactions, transactionSigner } = useWallet();
+  const { network } = useNetwork();
+  
+  // Get algod config based on selected network
+  const algodConfig = useMemo(() => {
+    return getAlgodConfigForNetwork(network);
+  }, [network]);
+  
+  const tradingService = useMemo(() => {
+    return new TradingService(algodConfig);
+  }, [algodConfig]);
   const [from, setFrom] = useState(fromAsset || 'ALGO');
   const [to, setTo] = useState(toAsset || 'USDC');
   const [amt, setAmt] = useState(amount || 1);
@@ -74,7 +93,8 @@ const SwapWidget: React.FC<SwapWidgetProps> = ({ fromAsset, toAsset, amount, onS
         amt,
         transactionSigner,
         activeAddress!,
-        signTransactions
+        signTransactions,
+        algodConfig
       );
       setSwapResult(result);
       if (result.status === 'success') {
@@ -106,8 +126,8 @@ const SwapWidget: React.FC<SwapWidgetProps> = ({ fromAsset, toAsset, amount, onS
     setToUsd(null);
   };
 
-  const fromMeta = getAssetMeta(from);
-  const toMeta = getAssetMeta(to);
+  const fromMeta = getAssetMeta(from, network);
+  const toMeta = getAssetMeta(to, network);
 
   return (
     <div className={cn(
@@ -193,7 +213,7 @@ const SwapWidget: React.FC<SwapWidgetProps> = ({ fromAsset, toAsset, amount, onS
       {error && <div className="text-red-600 mt-2 w-full text-center text-xs font-medium">{error}</div>}
               {swapResult && swapResult.status === 'success' && (
                 <div className="text-emerald-600 mt-2 w-full text-center text-xs font-medium">
-                  Swap successful! <a href={`https://lora.algokit.io/testnet/transaction/${swapResult.txid}`} target="_blank" rel="noopener noreferrer" className="text-primary underline">View on Explorer</a>
+                  Swap successful! <a href={`https://lora.algokit.io/${network}/transaction/${swapResult.txid}`} target="_blank" rel="noopener noreferrer" className="text-primary underline">View on Explorer</a>
                 </div>
               )}
       {!activeAddress && <div className="text-red-600 mt-2 text-center text-xs font-medium">Connect your wallet to swap</div>}
