@@ -159,11 +159,11 @@ The bot will ask for your mnemonic phrase to connect an existing wallet.
 ### Sending ALGO
 
 ```
-send 2 algos to K54ZTTHNDB567Q5J5T73CEJCT3Z3MB6VL35PJBIX57KGRWNGZZLH3BK7S4
+send 2 algos to RUXSTPANLEGZY5BDDA3SWRSG5JME67UYXII65XXI6GSY3HCQRSWMAPKCKY
 ```
 
 ```
-send 2 algos to both K54ZTTHNDB567Q5J5T73CEJCT3Z3MB6VL35PJBIX57KGRWNGZZLH3BK7S4 and 6MZK4765UUZFBPAPXZBNXTIRHORJ75KBKRIGHVOB23OQODVMSB6GCL5DVM
+send 2 algos to both RUXSTPANLEGZY5BDDA3SWRSG5JME67UYXII65XXI6GSY3HCQRSWMAPKCKY and 6MZK4765UUZFBPAPXZBNXTIRHORJ75KBKRIGHVOB23OQODVMSB6GCL5DVM
 ```
 
 ### NFT Operations
@@ -185,7 +185,7 @@ Opt out of NFT 740574628
 ```
 
 ```
-Send NFT 740830836 to K54ZTTHNDB567Q5J5T73CEJCT3Z3MB6VL35PJBIX57KGRWNGZZLH3BK7S4
+Send NFT 740830836 to RUXSTPANLEGZY5BDDA3SWRSG5JME67UYXII65XXI6GSY3HCQRSWMAPKCKY
 ```
 
 ### Balance Check
@@ -270,8 +270,8 @@ Test the bot by sending commands to your bot on Telegram. Make sure you're using
 
 | Asset | Symbol | Asset ID | Explorer |
 |-------|--------|----------|----------|
-| Algorand | ALGO | 0 | [Explorer](https://testnet.explorer.perawallet.app/) |
-| USD Coin | USDC | 10458941 | [Asset](https://testnet.explorer.perawallet.app/asset/10458941) |
+| Algorand | ALGO | 0 | [Explorer](https://lora.algokit.io/testnet/) |
+| USD Coin | USDC | 10458941 | [Asset](https://lora.algokit.io/testnet/asset/10458941) |
 
 ### Testnet Faucet
 
@@ -281,7 +281,7 @@ Get free testnet ALGO from:
 ### Testnet Explorer
 
 View your transactions:
-- [Testnet Explorer](https://testnet.explorer.perawallet.app/)
+- [Testnet Explorer](https://lora.algokit.io/testnet/)
 
 ---
 
@@ -320,7 +320,7 @@ View your transactions:
 - Ensure you have sufficient ALGO for transaction fees
 - Verify the recipient address is valid
 - Check network configuration (testnet vs mainnet)
-- View transaction on [Testnet Explorer](https://testnet.explorer.perawallet.app/)
+- View transaction on [Testnet Explorer](https://lora.algokit.io/testnet/)
 
 ### NFT Creation Failed
 - Verify `PINATA_API_KEY` and `PINATA_API_SECRET` are correct
@@ -360,6 +360,12 @@ pip install -r requirements.txt --upgrade
 - **Logs**: `bot.log` and `security_events.log`
 
 ⚠️ **Important**: Never share your `.env` file or `telegram_sessions.json` publicly!
+
+---
+
+## 🎥 Demo
+
+- **Telegram YouTube Demo**: [https://youtu.be/gwnjztTM3wI](https://youtu.be/gwnjztTM3wI)
 
 ---
 
