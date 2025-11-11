@@ -1,231 +1,428 @@
-# Algo-Intent
+# AlgoIntent
 
-Algo-Intent is a dual-experience project for the Algorand ecosystem:
+<div align="center">
 
-- A conversational, AI-powered Telegram bot to manage wallets, transfer ALGO, mint/transfer NFTs, and more.
-- A modern web app (Vite + React + TypeScript + Tailwind) named `algointent` that brings similar intent-driven actions to the browser with wallet connectivity and a swap widget.
+**Natural Language Interface for Algorand Blockchain**
 
-Both experiences share the same vision: describe what you want to do in plain English, and let the system translate that into secure Algorand transactions.
+[🌐 Live Web App](https://www.algointent.xyz/) | [📱 Telegram Bot](#telegram-bot) | [💬 WhatsApp Bot](#whatsapp-bot) | [📖 Documentation](./algointent/projects/algointent/README.md)
 
----
-
-## 🚀 Key Features
-
-- **AI Intent Parsing**: Natural language to Algorand actions (Telegram bot and web app).
-- **Secure Wallet Management**: Create/connect/disconnect wallets with password protection (bot) and browser wallet connect (web).
-- **Send ALGO**: Single or multi-recipient transfers, including atomic groups (bot).
-- **NFT Support**: Create NFTs with media, transfer NFTs, opt-in/out (bot).
-- **IPFS Integration**: Upload NFT media to IPFS via Pinata (bot).
-- **Swap Widget**: Integrated trading experience in the web app.
-- **Permission-Based Security**: Explicit password confirmation for transactions (bot).
-- **Ephemeral Sensitive Data**: Passwords/mnemonics never persisted; messages auto-deleted (bot).
-- **Network Flexibility**: TestNet and MainNet supported.
+</div>
 
 ---
 
-## 🔭 In Progress
+## 🎯 Overview
 
-- **DeFi integrations**: DEX aggregation, liquidity provision, and yield opportunities in the web app.
-- **Calendar integration**: Schedule future transactions, recurring transfers, and smart reminders.
-- **Social login**: OAuth-based sign-in (e.g., Google/Apple) for smoother onboarding and linking wallets.
-- **And more**: Additional wallet connectors, richer analytics, and expanded asset support.
+**AlgoIntent** is a revolutionary multi-platform interface that enables users to interact with the Algorand blockchain using natural language. Instead of navigating complex interfaces or writing code, users simply describe what they want to do in plain English, and AlgoIntent translates their intent into secure Algorand transactions.
 
----
+### Why AlgoIntent?
 
-## 🧭 Repository Layout
-
-```
-algo-intent/
-├── README.md
-├── telegram_bot/                      # Telegram bot implementation (Python)
-│   ├── ai_intent.py                   # AI intent parsing
-│   ├── app.py                         # Optional app bootstrap
-│   ├── intent_parser.py               # Intent parsing helpers
-│   ├── ipfs_utils.py                  # IPFS (Pinata) helpers
-│   ├── telegram_bot.py                # Main Telegram bot entrypoint
-│   ├── transaction_builder.py         # Transaction building/sending
-│   ├── utils.py                       # Shared utilities
-│   ├── wallet.py                      # Wallet and encryption helpers
-│   └── requirements.txt               # Python dependencies
-└── algointent/                        # Web app workspace (Vite + React + TS)
-    ├── algointent.code-workspace
-    └── projects/algointent/
-        ├── package.json               # Frontend dependencies/scripts
-        ├── public/
-        │   ├── index.html
-        │   └── robots.txt
-        └── src/
-            ├── App.tsx
-            ├── Home.tsx
-            ├── components/            # UI + feature components
-            │   ├── Account.tsx
-            │   ├── AlgoIntentChat.tsx
-            │   ├── ConnectWallet.tsx
-            │   ├── ErrorBoundary.tsx
-            │   ├── SwapWidget.tsx
-            │   ├── Transact.tsx
-            │   └── WalletConnectButton.tsx
-            ├── services/              # API/service layer
-            │   ├── aiIntentService.ts
-            │   ├── ipfsService.ts
-            │   ├── tradingService.ts
-            │   └── transactionService.ts
-            ├── utils/
-            │   ├── ellipseAddress.ts
-            │   └── network/getAlgoClientConfigs.ts
-            ├── interfaces/network.ts
-            ├── styles/                # Tailwind + app styles
-            │   ├── App.css
-            │   └── tailwind.css
-            ├── typings/
-            │   └── tinyman-swap-widget-sdk.d.ts
-            ├── main.tsx
-            └── vite-env.d.ts
-```
+- **🚀 Zero Learning Curve**: No need to understand blockchain jargon or technical details
+- **💬 Natural Language**: "Send 2 ALGO to John" works just like you'd say it
+- **🔒 Secure**: Leverages Algorand's secure transaction model with wallet integration
+- **🌐 Multi-Platform**: Available as a web app, Telegram bot, and WhatsApp bot
+- **⚡ Fast**: Built on Algorand's high-performance blockchain
+- **🎨 Modern UI**: Beautiful, responsive web interface with wallet connectivity
 
 ---
 
-## 📝 Example Telegram Commands
+## 🏗️ Architecture
 
-Copy-paste or type these directly to the bot:
+AlgoIntent consists of three main components:
+
+### 1. **Web Application** (`algointent/`)
+- **Tech Stack**: React + TypeScript + Vite + Tailwind CSS
+- **Features**: 
+  - Conversational chat interface
+  - Wallet connectivity (Pera, Defly, Exodus)
+  - Integrated swap widget (Tinyman v2)
+  - Real-time price tracking
+  - Atomic transaction support
+- **Deployment**: [https://www.algointent.xyz/](https://www.algointent.xyz/)
+
+### 2. **Telegram Bot** (`telegram_bot/`)
+- **Tech Stack**: Python + python-telegram-bot
+- **Features**:
+  - Wallet creation and management
+  - NFT creation with IPFS uploads
+  - Multi-recipient transfers
+  - Password-protected transactions
+- **See**: [Telegram Bot README](./telegram_bot/README.md)
+
+### 3. **WhatsApp Bot** (`whatsapp-bot/`)
+- **Tech Stack**: TypeScript + Node.js + Express
+- **Features**:
+  - Queue-based message processing
+  - Redis for job management
+  - Vault integration for secure key storage
+  - Multi-asset support
+- **See**: [WhatsApp Bot README](./whatsapp-bot/README.md)
+
+### Core Components
 
 ```
-create me a new wallet
-
-I want to connect my wallet
-
-send 2 algos to this address K54ZTTHNDB567Q5J5T73CEJCT3Z3MB6VL35PJBIX57KGRWNGZZLH3BK7S4
-
-Create 10 nfts with name Universe and give it description "This image shows our milky way"
-
-send 2 algos to both K54ZTTHNDB567Q5J5T73CEJCT3Z3MB6VL35PJBIX57KGRWNGZZLH3BK7S4 and 6MZK4765UUZFBPAPXZBNXTIRHORJ75KBKRIGHVOB23OQODVMSB6GCL5DVM
-
-Opt in for NFT 740574628
-
-Opt out of NFT 740574628
-
-Send NFT 740830836 to K54ZTTHNDB567Q5J5T73CEJCT3Z3MB6VL35PJBIX57KGRWNGZZLH3BK7S4
-
-Disconnect my wallet
+┌─────────────────────────────────────────────────────────────┐
+│                    User Interface Layer                      │
+│  (Web App / Telegram Bot / WhatsApp Bot)                    │
+└──────────────────────┬──────────────────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────────────────┐
+│                  AI Intent Parser                            │
+│  (Perplexity AI API - Natural Language → Structured Intent) │
+└──────────────────────┬──────────────────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────────────────┐
+│              Transaction Service Layer                       │
+│  (Algorand SDK / AlgoKit Utils / Tinyman SDK)               │
+└──────────────────────┬──────────────────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────────────────┐
+│                  Algorand Blockchain                         │
+│              (Testnet / Mainnet)                             │
+└─────────────────────────────────────────────────────────────┘
 ```
-
-You can also send images or videos with captions like
-`Create NFT named "Sunset" with description "Evening view"`
-to mint NFTs with media.
 
 ---
 
-## 📦 Setup
+## 🚀 Quick Start
 
-### 1) Clone the repository
+### Prerequisites
 
+- **Node.js** 20+ and npm 9+ (for web app and WhatsApp bot)
+- **Python** 3.8+ (for Telegram bot)
+- **Algorand Wallet** (Pera, Defly, or Exodus for web app)
+- **API Keys**:
+  - Perplexity AI API key (for intent parsing)
+  - Pinata API keys (for IPFS uploads - Telegram bot)
+  - Meta WhatsApp Cloud API credentials (for WhatsApp bot)
+
+### Web Application
+
+```bash
+# Navigate to web app directory
+cd algointent/projects/algointent
+
+# Install dependencies
+npm install
+
+# Create environment file
+cp env.template .env
+
+# Add your API keys to .env
+# VITE_PERPLEXITY_API_KEY=your_key_here
+# VITE_ALGOD_ADDRESS=https://testnet-api.algonode.cloud
+# VITE_NETWORK=testnet
+
+# Start development server
+npm run dev
+
+# Build for production
+npm run build
 ```
-git clone https://github.com/caerlower/algo-intent.git
-cd algo-intent
-```
 
-### 2) Telegram Bot (Python)
+**Live Demo**: [https://www.algointent.xyz/](https://www.algointent.xyz/)
 
-- Install dependencies:
-```
+### Telegram Bot
+
+```bash
+# Navigate to Telegram bot directory
 cd telegram_bot
+
+# Install dependencies
 pip install -r requirements.txt
-```
 
-- Create a `.env` file in `telegram_bot/` with:
-  - `TELEGRAM_BOT_TOKEN` (from @BotFather)
-  - `ALGOD_ADDRESS`, `ALGOD_TOKEN` (Algorand node)
-  - `PINATA_API_KEY`, `PINATA_API_SECRET` (for IPFS uploads)
-  - `PERPLEXITY_API_KEY` (for AI intent parsing)
+# Create .env file with:
+# TELEGRAM_BOT_TOKEN=your_bot_token
+# PERPLEXITY_API_KEY=your_api_key
+# PINATA_API_KEY=your_pinata_key
+# PINATA_API_SECRET=your_pinata_secret
+# ALGOD_ADDRESS=https://testnet-api.algonode.cloud
 
-- Run the bot:
-```
+# Run the bot
 python telegram_bot.py
 ```
 
-### 3) Web App (Vite + React + TypeScript)
+**See**: [Telegram Bot README](./telegram_bot/README.md) for detailed setup
 
-- Install Node dependencies:
-```
-cd algointent/projects/algointent
+### WhatsApp Bot
+
+```bash
+# Navigate to WhatsApp bot directory
+cd whatsapp-bot
+
+# Install dependencies
 npm install
-```
 
-- Start the dev server:
-```
+# Create .env file (see whatsapp-bot/README.md for details)
+# Build TypeScript
+npm run build
+
+# Run in development
 npm run dev
+
+# Run in production
+npm start
 ```
 
-- Common environment variables (if applicable; create `.env` or use Vite `import.meta.env`):
-  - `VITE_ALGOD_ADDRESS`, `VITE_ALGOD_TOKEN`
-  - `VITE_NETWORK` (e.g., `testnet` or `mainnet`)
-  - Any API keys required by `aiIntentService.ts` or other services
+**See**: [WhatsApp Bot README](./whatsapp-bot/README.md) for detailed setup
 
 ---
 
-## 🧩 Web App Highlights
+## 📋 Supported Operations
 
-- `AlgoIntentChat.tsx`: Conversational UI for intent input.
-- `ConnectWallet.tsx` and `WalletConnectButton.tsx`: Wallet connection flow.
-- `SwapWidget.tsx`: Integrated swap/trading widget.
-- `transactionService.ts` and `tradingService.ts`: Encapsulated Algorand and trading logic.
-- `ErrorBoundary.tsx`: Improved resilience.
-- Tailwind-based styling with `styles/tailwind.css` and `tailwind.config.js`.
+### Wallet Operations
+- ✅ Send ALGO to single or multiple recipients
+- ✅ Send assets (USDC, USDT, etc.) to recipients
+- ✅ Check wallet balance
+- ✅ Create and manage wallets
+- ✅ Connect/disconnect wallets
+
+### NFT Operations
+- ✅ Create NFTs with custom names and descriptions
+- ✅ Upload NFT media to IPFS (Telegram bot)
+- ✅ Transfer NFTs to recipients
+- ✅ Opt-in/opt-out of assets
+
+### Trading Operations (Web App)
+- ✅ Swap tokens via Tinyman v2 (ALGO ↔ USDC)
+- ✅ Real-time price quotes
+- ✅ Integrated swap widget
+
+### Advanced Features
+- ✅ Atomic transactions (multiple actions in one transaction)
+- ✅ Multi-recipient transfers
+- ✅ Transaction history tracking
+- ✅ Real-time price updates
+
+---
+
+## 🔗 Deployed Assets & Contracts
+
+### Testnet Assets
+
+| Asset | Symbol | Asset ID | Explorer Link |
+|-------|--------|----------|---------------|
+| Algorand | ALGO | 0 | [View on Explorer](https://testnet.explorer.perawallet.app/) |
+| USD Coin | USDC | 10458941 | [View Asset](https://testnet.explorer.perawallet.app/asset/10458941) |
+| TinyUSDC | TINYUSDC | 21582668 | [View Asset](https://testnet.explorer.perawallet.app/asset/21582668) |
+
+### Smart Contracts
+
+AlgoIntent uses the following Algorand protocols:
+
+- **Tinyman v2 DEX**: For token swaps
+  - Pool contracts deployed on Algorand Testnet
+  - [Tinyman Documentation](https://docs.tinyman.org/)
+
+### Network Information
+
+- **Testnet Explorer**: [https://testnet.explorer.perawallet.app/](https://testnet.explorer.perawallet.app/)
+- **Mainnet Explorer**: [https://explorer.perawallet.app/](https://explorer.perawallet.app/)
+- **Algorand Testnet Faucet**: [https://bank.testnet.algorand.network/](https://bank.testnet.algorand.network/)
+
+---
+
+## 💡 Example Usage
+
+### Web Application
+
+Visit [https://www.algointent.xyz/app](https://www.algointent.xyz/app) and try:
+
+```
+"Send 2 ALGO to ABC123..."
+"Check my balance"
+"Swap 10 ALGO for USDC"
+"Create an NFT named MyArt"
+"Send 1 ALGO and 5 USDC to ABC123..."
+"Send 2 ALGO to ADDR1 and opt in for asset 123456"
+```
+
+### Telegram Bot
+
+```
+create me a new wallet
+send 5 algos to K54ZTTHNDB567Q5J5T73CEJCT3Z3MB6VL35PJBIX57KGRWNGZZLH3BK7S4
+Create 10 nfts with name Universe and description "This image shows our milky way"
+send 2 algos to both K54ZTTHNDB567Q5J5T73CEJCT3Z3MB6VL35PJBIX57KGRWNGZZLH3BK7S4 and 6MZK4765UUZFBPAPXZBNXTIRHORJ75KBKRIGHVOB23OQODVMSB6GCL5DVM
+Opt in for NFT 740574628
+```
+
+### WhatsApp Bot
+
+```
+Send 2 ALGO to +1234567890
+Check my balance
+Opt-in ASA 12345
+```
+
+---
+
+## 🛠️ Technology Stack
+
+### Frontend (Web App)
+- **Framework**: React 18 + TypeScript
+- **Build Tool**: Vite
+- **Styling**: Tailwind CSS + shadcn/ui
+- **Routing**: React Router DOM
+- **State Management**: React Hooks + TanStack Query
+- **Wallet Integration**: `@txnlab/use-wallet-react`
+- **Algorand SDK**: `algosdk` + `@algorandfoundation/algokit-utils`
+- **Trading**: `@tinymanorg/tinyman-swap-widget-sdk`
+
+### Backend Services
+- **AI Intent Parsing**: Perplexity AI API
+- **IPFS Storage**: Pinata API
+- **Blockchain**: Algorand Testnet/Mainnet
+- **DEX Integration**: Tinyman v2
+
+### Telegram Bot
+- **Language**: Python 3.8+
+- **Framework**: python-telegram-bot
+- **Algorand SDK**: `py-algorand-sdk`
+
+### WhatsApp Bot
+- **Language**: TypeScript
+- **Runtime**: Node.js 18+
+- **Framework**: Express.js
+- **Queue System**: BullMQ + Redis
+- **Vault**: HashiCorp Vault (for key management)
+
+---
+
+## 📁 Repository Structure
+
+```
+algo-intent/
+├── README.md                    # This file
+├── algointent/                  # Web application
+│   └── projects/algointent/
+│       ├── src/
+│       │   ├── components/      # React components
+│       │   ├── services/        # Business logic & API services
+│       │   ├── pages/           # Page components
+│       │   └── utils/           # Utility functions
+│       ├── package.json
+│       └── README.md
+├── telegram_bot/                # Telegram bot (Python)
+│   ├── telegram_bot.py          # Main bot entrypoint
+│   ├── ai_intent.py             # AI intent parsing
+│   ├── transaction_builder.py    # Transaction building
+│   ├── wallet.py                # Wallet management
+│   ├── ipfs_utils.py            # IPFS integration
+│   └── README.md                # Telegram bot documentation
+└── whatsapp-bot/                # WhatsApp bot (TypeScript)
+    ├── src/
+    │   ├── index.ts             # Main entrypoint
+    │   ├── intent/              # Intent parsing engine
+    │   ├── transaction/         # Transaction execution
+    │   ├── wallet/              # Wallet management
+    │   └── webhook/             # WhatsApp webhook handlers
+    └── README.md                # WhatsApp bot documentation
+```
 
 ---
 
 ## 🔒 Security
 
-- Sensitive data is never logged or persisted. Telegram bot deletes passwords/mnemonics after use.
-- Wallet operations require explicit user consent (bot); the web app leverages the user’s wallet provider for approvals.
-- Rate limiting and session management protect against abuse.
+- **No Key Storage**: Private keys are never stored on servers
+- **Wallet Integration**: Web app uses secure wallet connectors (Pera, Defly, Exodus)
+- **Password Protection**: Telegram bot requires passwords for sensitive operations
+- **Input Sanitization**: All user inputs are sanitized to prevent injection attacks
+- **Rate Limiting**: Protection against abuse and spam
+- **Ephemeral Data**: Sensitive data (mnemonics, passwords) are deleted immediately after use
 
 ---
 
-## 🛡️ Troubleshooting & Tips
+## 🌐 Network Support
 
-- **Transaction appears failed but succeeded?** Always verify TxID in `https://testnet.explorer.perawallet.app`.
-- **NFT/ALGO not received?** Ensure the recipient has opted-in (NFTs) and verify balances/history.
-- **Bot misinterprets a command?** Rephrase or try the example commands.
-- **Lost wallet access?** If you have your mnemonic, you can restore the wallet. The bot cannot recover lost mnemonics/passwords.
+| Network | Status | Explorer | Notes |
+|---------|--------|----------|-------|
+| **Testnet** | ✅ Fully Supported | [testnet.explorer.perawallet.app](https://testnet.explorer.perawallet.app/) | Recommended for testing |
+| **Mainnet** | ⚠️ Beta | [explorer.perawallet.app](https://explorer.perawallet.app/) | Use with caution |
 
 ---
 
-## 🌐 Supported Networks
+## 🧩 Key Features
 
-| Network | Status  | Explorer Link                           |
-|---------|---------|-----------------------------------------|
-| Testnet | ✅ Live | `https://testnet.explorer.perawallet.app` |
-| Mainnet | ⚠️ Beta | `https://explorer.perawallet.app/`        |
+### AI-Powered Intent Parsing
+- Natural language understanding via Perplexity AI
+- Context-aware responses
+- Multi-intent support (e.g., "Send ALGO and opt-in to asset")
+
+### Atomic Transactions
+- Execute multiple operations in a single transaction
+- Ensures all-or-nothing execution
+- Reduces transaction fees
+
+### Multi-Platform Support
+- **Web**: Modern, responsive interface with wallet connectivity
+- **Telegram**: Conversational bot with media support
+- **WhatsApp**: Queue-based processing for scalability
+
+### DeFi Integration
+- Tinyman v2 DEX integration for token swaps
+- Real-time price quotes
+- Seamless trading experience
 
 ---
 
 ## 🤝 Contributing
 
-Pull requests, issues, and feature suggestions are welcome.
+We welcome contributions! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
 ---
 
 ## 📜 License
 
-MIT License — see `LICENSE` for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
 ## 🙋 FAQ
 
-- **Can I use this on mainnet?** Yes. Point `ALGOD_ADDRESS` to a mainnet node and fund your wallet.
-- **Is my mnemonic/password safe?** Yes. They’re never stored or logged; bot deletes sensitive data ASAP.
-- **How does the system understand my commands?** AI intent parsing extracts actions and parameters from plain English.
+**Q: Can I use this on mainnet?**  
+A: Yes, but it's currently in beta. Change your network configuration to mainnet and ensure you have sufficient ALGO for fees.
+
+**Q: Is my wallet information safe?**  
+A: Yes. The web app never stores your private keys - all transactions are signed by your connected wallet. The Telegram bot encrypts and deletes sensitive data immediately after use.
+
+**Q: How does the AI understand my commands?**  
+A: We use Perplexity AI to parse natural language into structured intents, which are then executed as Algorand transactions.
+
+**Q: What wallets are supported?**  
+A: Web app supports Pera Wallet, Defly, and Exodus. Telegram and WhatsApp bots manage wallets internally.
+
+**Q: Can I create custom NFTs?**  
+A: Yes! The Telegram bot supports creating NFTs with custom names, descriptions, and media uploads to IPFS.
 
 ---
 
-## 🏁 Demo
+## 🎥 Demo
 
-YouTube: `https://youtu.be/gwnjztTM3wI`
+- **YouTube Demo**: [https://youtu.be/gwnjztTM3wI](https://youtu.be/gwnjztTM3wI)
+- **Live Web App**: [https://www.algointent.xyz/](https://www.algointent.xyz/)
 
 ---
 
-Thank you for using Algo-Intent!
+## 📞 Support
 
-Build For Hack Series 2025
+- **Issues**: [GitHub Issues](https://github.com/caerlower/algo-intent/issues)
+- **Documentation**: See individual README files in each component directory
+
+---
+
+<div align="center">
+
+**Built for Build For Hack Series 2025**
+
+Made with ❤️ for the Algorand community
+
+</div>
