@@ -1,11 +1,12 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useTheme } from "next-themes";
 import { useEnhancedWallet } from '../providers/EnhancedWalletProvider';
+import { useNetwork } from '../providers/NetworkProvider';
 import { aiIntentService, ParsedIntent } from '../services/aiIntentService';
 import { TransactionService, NFTMetadata } from '../services/transactionService';
-import { tradingService, tinymanSigner } from '../services/tradingService';
+import { TradingService, tinymanSigner } from '../services/tradingService';
 import { ipfsService } from '../services/ipfsService';
-import { getAlgodConfigFromViteEnvironment } from '../utils/network/getAlgoClientConfigs';
+import { getAlgodConfigForNetwork } from '../utils/network/getAlgoClientConfigs';
 import algosdk from 'algosdk';
 import { Link, useLocation } from 'react-router-dom';
 
@@ -15,8 +16,10 @@ import ChatMessage from "@/components/ChatMessage";
 import ChatInput from "@/components/ChatInput";
 import WalletConnectButton from "@/components/WalletConnectButton";
 import SwapWidget from "@/components/SwapWidget";
+import { NetworkToggle } from "@/components/NetworkToggle";
 import { Button } from "@/components/ui/button";
-import { Menu, Moon, Sun, X } from "lucide-react";
+import { Menu, Moon, Sun, X, AlertTriangle } from "lucide-react";
+import { MainnetWarning } from "@/components/MainnetWarning";
 
 interface Message {
   id: string; // Unique ID for message updates
@@ -75,6 +78,7 @@ const Index = () => {
   
   const { activeAddress, transactionSigner, signTransactions, isGoogleConnected, googleUser, googleWallet } = useEnhancedWallet();
   const { theme, setTheme } = useTheme();
+  const { network, isMainnet, setNetwork } = useNetwork();
 
   const navLinks = [
     { to: "/", label: "Home" },
@@ -98,8 +102,19 @@ const Index = () => {
     return () => clearInterval(interval);
   }, []);
   
-  const algodConfig = getAlgodConfigFromViteEnvironment();
-  const transactionService = new TransactionService(algodConfig);
+  // Get algod config based on selected network
+  const algodConfig = useMemo(() => {
+    return getAlgodConfigForNetwork(network);
+  }, [network]);
+  
+  const transactionService = useMemo(() => {
+    return new TransactionService(algodConfig);
+  }, [algodConfig]);
+  
+  // Create trading service instance with network config
+  const tradingServiceInstance = useMemo(() => {
+    return new TradingService(algodConfig);
+  }, [algodConfig]);
 
   // Load pending image from session storage on mount
   useEffect(() => {
@@ -410,14 +425,16 @@ const Index = () => {
               let finalAssetId = assetId;
               let assetName = parameters.asset_name || `Asset ${assetId}`;
               
-              // Check if it's a known asset by name
+              // Check if it's a known asset by name - use network-aware asset IDs
               if (parameters.asset_name) {
                 const assetNameUpper = parameters.asset_name.toUpperCase();
+                // Network-aware asset ID mapping
                 if (assetNameUpper === 'USDC') {
-                  finalAssetId = 10458941; // USDC testnet asset ID
+                  finalAssetId = network === 'mainnet' ? 31566704 : 10458941; // USDC mainnet: 31566704, testnet: 10458941
                   assetName = 'USDC';
                 } else if (assetNameUpper === 'USDT') {
-                  finalAssetId = 10458942; // USDT testnet asset ID (if exists)
+                  // USDT asset IDs (update with actual mainnet ID when known)
+                  finalAssetId = network === 'mainnet' ? 312769 : 10458942; // USDT mainnet: 312769, testnet: 10458942 (if exists)
                   assetName = 'USDT';
                 }
               }
@@ -901,7 +918,7 @@ const Index = () => {
     addBotMessage(`🔄 Setting limit order: ${orderType.toUpperCase()} ${parameters.amount} ${parameters.from_asset} at $${parameters.trigger_price}...`, 'pending');
     
     try {
-      const result = await tradingService.setLimitOrder(
+      const result = await tradingServiceInstance.setLimitOrder(
         parameters.from_asset,
         parameters.to_asset,
         parameters.amount,
@@ -932,7 +949,7 @@ const Index = () => {
     addBotMessage(`🔄 Setting stop-loss: Sell ${parameters.amount} ${parameters.asset} when price drops to $${parameters.trigger_price}...`, 'pending');
     
     try {
-      const result = await tradingService.setStopLoss(
+      const result = await tradingServiceInstance.setStopLoss(
         parameters.asset,
         parameters.amount,
         parameters.trigger_price,
@@ -960,7 +977,7 @@ const Index = () => {
     const messageId = addBotMessage(`Fetching current prices for ${assetNames}...`, 'pending');
     
     try {
-      const prices = await tradingService.getPrices(assets);
+      const prices = await tradingServiceInstance.getPrices(assets);
       
       if (prices.length > 0) {
         // Format message to include price information that can be parsed for transaction details
@@ -1029,12 +1046,12 @@ const Index = () => {
             </div>
 
             <div className="flex items-center gap-2">
-              <WalletConnectButton />
+              <NetworkToggle />
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                className="rounded-full hidden sm:flex"
+                className="rounded-full"
               >
                 {theme === "dark" ? (
                   <Sun className="h-5 w-5" />
@@ -1042,6 +1059,7 @@ const Index = () => {
                   <Moon className="h-5 w-5" />
                 )}
               </Button>
+              <WalletConnectButton />
               <Button 
                 variant="ghost" 
                 size="icon" 
@@ -1101,6 +1119,9 @@ const Index = () => {
           )}
         </div>
       </header>
+
+      {/* Mainnet Warning Banner */}
+      <MainnetWarning />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
