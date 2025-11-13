@@ -73,6 +73,8 @@ function resolveAssetId(symbolOrId: string, network: 'testnet' | 'mainnet'): num
 
 const { poolUtils, SwapType, Swap } = tinyman;
 
+const OPT_IN_CACHE: Map<string, Set<number>> = new Map();
+
 // Helper function to create algod client from config
 function createAlgodClient(algodConfig: any): algosdk.Algodv2 {
   return new algosdk.Algodv2(
@@ -300,6 +302,10 @@ export class TradingService {
       const assetInAmount = { ...assetIn, amount: BigInt(Math.floor(amount * 10 ** assetInDecimals)) };
       console.log('Tinyman swap assetIn:', assetIn, 'assetOut:', assetOut, 'amount:', assetInAmount.amount.toString());
 
+      // Ensure we're opted in to both assets if they are not ALGO
+      await this.ensureOptIn(algodClient, sender, assetInId, signer, signTransactions);
+      await this.ensureOptIn(algodClient, sender, assetOutId, signer, signTransactions);
+
       // 1. Fetch pool (Tinyman SDK)
       const pool = await poolUtils.v2.getPoolInfo({
         client: algodClient,
@@ -383,6 +389,74 @@ export class TradingService {
         error: error?.message || String(error)
       };
     }
+  }
+
+  private async ensureOptIn(
+    algodClient: algosdk.Algodv2,
+    sender: string,
+    assetId: number,
+    signer: any,
+    signTransactions?: (txns: Uint8Array[]) => Promise<(Uint8Array | null)[]>
+  ): Promise<void> {
+    if (!assetId || assetId === 0) return;
+
+    const cache = OPT_IN_CACHE.get(sender) ?? new Set<number>();
+    if (cache.has(assetId)) return;
+
+    let alreadyOptedIn = false;
+    try {
+      await algodClient.accountAssetInformation(sender, assetId).do();
+      alreadyOptedIn = true;
+    } catch (error: any) {
+      const status = error?.statusCode ?? error?.response?.status;
+      if (status && status !== 404) {
+        throw error;
+      }
+    }
+
+    if (alreadyOptedIn) {
+      cache.add(assetId);
+      OPT_IN_CACHE.set(sender, cache);
+      return;
+    }
+
+    const params = await algodClient.getTransactionParams().do();
+    const extendedParams = {
+      ...(params as any),
+      lastRound: ((params as any).lastRound ?? 0) + 60,
+    };
+    const optInTxn = algosdk.makeAssetTransferTxnWithSuggestedParamsFromObject({
+      sender,
+      receiver: sender,
+      assetIndex: assetId,
+      amount: 0,
+      suggestedParams: extendedParams,
+    });
+
+    const txnBytes = algosdk.encodeUnsignedTransaction(optInTxn);
+    let signed: Uint8Array[];
+
+    if (typeof signer === 'function') {
+      signed = await signer([txnBytes], [0]);
+    } else if (signTransactions) {
+      const result = await signTransactions([txnBytes]);
+      signed = result.filter(Boolean) as Uint8Array[];
+    } else {
+      throw new Error('No signer available for asset opt-in');
+    }
+
+    if (!signed || signed.length === 0) {
+      throw new Error('Failed to sign opt-in transaction');
+    }
+
+    const sendResult: any = await algodClient.sendRawTransaction(signed[0]).do();
+    const optInTxId = sendResult?.txId || sendResult?.txid;
+    if (!optInTxId) {
+      throw new Error('Unable to determine opt-in transaction id');
+    }
+    await algosdk.waitForConfirmation(algodClient, optInTxId, 5);
+    cache.add(assetId);
+    OPT_IN_CACHE.set(sender, cache);
   }
 
   // Helper to fetch decimals for an ASA
