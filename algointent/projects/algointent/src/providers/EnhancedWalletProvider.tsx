@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { useWallet, WalletProvider } from '@txnlab/use-wallet-react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useWallet } from '@txnlab/use-wallet-react';
 import { GoogleAuthService, GoogleUser } from '../services/googleAuthService';
+import algosdk, { TransactionSigner } from 'algosdk';
 
 interface SocialWalletContextType {
   isGoogleConnected: boolean;
@@ -9,6 +10,10 @@ interface SocialWalletContextType {
   connectGoogleWallet: () => Promise<void>;
   disconnectGoogleWallet: () => Promise<void>;
   refreshGoogleWalletState: () => void;
+  pendingApproval: algosdk.Transaction[] | null;
+  approvePendingApproval: () => void;
+  rejectPendingApproval: () => void;
+  requestApproval: (transactions: algosdk.Transaction[]) => Promise<boolean>;
 }
 
 const SocialWalletContext = createContext<SocialWalletContextType | null>(null);
@@ -30,6 +35,8 @@ export const SocialWalletProvider: React.FC<SocialWalletProviderProps> = ({ chil
   const [googleUser, setGoogleUser] = useState<GoogleUser | null>(null);
   const [googleWallet, setGoogleWallet] = useState<{ address: string; vaultKeyName: string; publicKey: string } | null>(null);
   const [googleAuthService] = useState(() => GoogleAuthService.getInstance());
+  const [approvalTransactions, setApprovalTransactions] = useState<algosdk.Transaction[] | null>(null);
+  const approvalResolverRef = useRef<((approved: boolean) => void) | null>(null);
 
   // Check for existing Google session on mount and periodically
   useEffect(() => {
@@ -100,6 +107,23 @@ export const SocialWalletProvider: React.FC<SocialWalletProviderProps> = ({ chil
     }
   };
 
+  const handleApprovalDecision = useCallback((approved: boolean) => {
+    approvalResolverRef.current?.(approved);
+    approvalResolverRef.current = null;
+    setApprovalTransactions(null);
+  }, []);
+
+  const requestApproval = useCallback((transactions: algosdk.Transaction[]): Promise<boolean> => {
+    if (approvalResolverRef.current) {
+      approvalResolverRef.current(false);
+    }
+
+    return new Promise<boolean>((resolve) => {
+      approvalResolverRef.current = resolve;
+      setApprovalTransactions(transactions);
+    });
+  }, []);
+
   const contextValue: SocialWalletContextType = {
     isGoogleConnected,
     googleUser,
@@ -107,6 +131,10 @@ export const SocialWalletProvider: React.FC<SocialWalletProviderProps> = ({ chil
     connectGoogleWallet,
     disconnectGoogleWallet,
     refreshGoogleWalletState,
+    pendingApproval: approvalTransactions,
+    approvePendingApproval: () => handleApprovalDecision(true),
+    rejectPendingApproval: () => handleApprovalDecision(false),
+    requestApproval,
   };
 
   return (
@@ -127,36 +155,85 @@ export const useEnhancedWallet = () => {
   // Determine if any wallet is connected
   const isConnected = socialWallet.isGoogleConnected || !!traditionalWallet.activeAddress;
 
-  // Enhanced transaction signer that handles Google wallet
-  const enhancedSignTransactions = async (transactions: any[]) => {
-    if (socialWallet.isGoogleConnected && socialWallet.googleWallet) {
-      // Use Google wallet for signing
-      const signedTransactions: Uint8Array[] = [];
-      const googleAuthService = GoogleAuthService.getInstance();
-      
-      for (const transaction of transactions) {
-        try {
-          const result = await googleAuthService.signTransaction(transaction);
-          if (result.signature) {
-            // Parse the signature and attach it to the transaction
-            const signatureBytes = new Uint8Array(Buffer.from(result.signature.split(':')[2], 'base64'));
-            const signedTransaction = new Uint8Array(transaction.length + signatureBytes.length);
-            signedTransaction.set(transaction);
-            signedTransaction.set(signatureBytes, transaction.length);
-            signedTransactions.push(signedTransaction);
-          } else {
-            throw new Error('Transaction signing failed: No signature returned');
-          }
-        } catch (error) {
-          throw new Error(`Google wallet signing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-      }
-      
-      return signedTransactions;
-    } else {
-      // Use traditional wallet for signing
-      return traditionalWallet.signTransactions(transactions);
+  const extractSignatureBytes = (signature: string): Uint8Array => {
+    const parts = signature.split(':');
+    const base64Signature = parts[parts.length - 1];
+    return new Uint8Array(Buffer.from(base64Signature, 'base64'));
+  };
+
+  const normalizeTransactionBytes = (txn: Uint8Array | algosdk.Transaction | any): Uint8Array => {
+    if (txn instanceof Uint8Array) {
+      return txn;
     }
+
+    if (txn && typeof txn === 'object') {
+      if (typeof txn.toByte === 'function') {
+        return txn.toByte();
+      }
+
+      if (txn.byteLength !== undefined && typeof txn.byteLength === 'number' && typeof txn.slice === 'function') {
+        return new Uint8Array(txn);
+      }
+
+      if (txn.bytes && txn.bytes instanceof Uint8Array) {
+        return txn.bytes;
+      }
+    }
+
+    throw new Error('Unsupported transaction format received for signing');
+  };
+
+  const googleTransactionSigner = useMemo<TransactionSigner | undefined>(() => {
+    if (!socialWallet.isGoogleConnected || !socialWallet.googleWallet) {
+      return undefined;
+    }
+
+    const googleAuthService = GoogleAuthService.getInstance();
+
+    const signer: TransactionSigner = async (txnGroup, indexesToSign) => {
+      const indexes = indexesToSign ?? txnGroup.map((_, index) => index);
+      const decodedTransactions = indexes.map((index) => {
+        const txnBytes = normalizeTransactionBytes(txnGroup[index]);
+        return algosdk.decodeUnsignedTransaction(txnBytes);
+      });
+
+      const approved = await socialWallet.requestApproval(decodedTransactions);
+      if (!approved) {
+        throw new Error('User rejected the signing request');
+      }
+
+      const signedTransactions: Uint8Array[] = [];
+
+      for (const index of indexes) {
+        const txnBytes = normalizeTransactionBytes(txnGroup[index]);
+        const decodedTxn = algosdk.decodeUnsignedTransaction(txnBytes);
+        const messageToSign = decodedTxn.bytesToSign();
+
+        const { signature } = await googleAuthService.signTransaction(messageToSign);
+        if (!signature) {
+          throw new Error('Transaction signing failed: No signature returned from Hashi signer');
+        }
+
+        const signatureBytes = extractSignatureBytes(signature);
+        const signerAddress =
+          socialWallet.googleWallet?.address || decodedTxn.sender.toString();
+        const signedTxn = decodedTxn.attachSignature(signerAddress, signatureBytes);
+        signedTransactions.push(new Uint8Array(signedTxn));
+      }
+
+      return signedTransactions;
+    };
+
+    return signer;
+  }, [socialWallet.isGoogleConnected, socialWallet.googleWallet, socialWallet.requestApproval]);
+
+  const enhancedSignTransactions = async (transactions: Uint8Array[]) => {
+    if (googleTransactionSigner) {
+      const indexes = transactions.map((_, index) => index);
+      return googleTransactionSigner(transactions as unknown as algosdk.Transaction[], indexes);
+    }
+
+    return traditionalWallet.signTransactions(transactions);
   };
 
   return {
@@ -164,6 +241,7 @@ export const useEnhancedWallet = () => {
     activeAddress,
     isConnected,
     signTransactions: enhancedSignTransactions,
+    transactionSigner: googleTransactionSigner ?? traditionalWallet.transactionSigner,
     // Social wallet specific
     isGoogleConnected: socialWallet.isGoogleConnected,
     googleUser: socialWallet.googleUser,
@@ -171,5 +249,8 @@ export const useEnhancedWallet = () => {
     connectGoogleWallet: socialWallet.connectGoogleWallet,
     disconnectGoogleWallet: socialWallet.disconnectGoogleWallet,
     refreshGoogleWalletState: socialWallet.refreshGoogleWalletState,
+    pendingApproval: socialWallet.pendingApproval,
+    approvePendingApproval: socialWallet.approvePendingApproval,
+    rejectPendingApproval: socialWallet.rejectPendingApproval,
   };
 };
