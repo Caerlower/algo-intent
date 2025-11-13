@@ -35,6 +35,11 @@ interface Message {
     toAsset?: string;
     amount?: number;
     fee?: string; // Store fee for transaction details
+    type?: string;
+    assetId?: number;
+    toAddress?: string;
+    amountDisplay?: string;
+    assetName?: string;
   };
 }
 
@@ -272,10 +277,25 @@ const Index = () => {
       const amountIsZero =
         (typeof rawAmount === 'bigint' ? rawAmount === 0n : Number(rawAmount) === 0);
       if (amountIsZero) return '0';
+
       const info = assetId !== undefined ? KNOWN_ASSET_INFO[assetId] : undefined;
-      const decimals = info?.decimals ?? 6;
-      const symbol = info?.symbol ?? (assetId !== undefined ? `Asset ${assetId}` : 'units');
-      return `${formatAmountWithDecimals(rawAmount, decimals)} ${symbol}`;
+      let decimals = info?.decimals;
+      const symbol = info?.symbol;
+
+      const bigAmount = typeof rawAmount === 'bigint' ? rawAmount : BigInt(Math.trunc(rawAmount));
+
+      if (decimals === undefined) {
+        if (bigAmount === 1n) {
+          decimals = 0;
+        } else if (bigAmount % 1_000_000n === 0n) {
+          decimals = 6;
+        } else {
+          decimals = 0;
+        }
+      }
+
+      const amountString = formatAmountWithDecimals(bigAmount, decimals);
+      return symbol ? `${amountString} ${symbol}` : amountString;
     },
     [KNOWN_ASSET_INFO, formatAmountWithDecimals]
   );
@@ -881,8 +901,9 @@ const Index = () => {
       await updateBalance();
 
       if (result.status === 'success') {
+        const shortRecipient = shortenAddress(parameters.recipient);
         updateMessage(messageId, {
-          content: result.message,
+          content: `✅ Sent ${amount} ${assetName || `asset ${assetId}`} to ${shortRecipient}`,
           status: 'success',
           txid: result.txid
         });
@@ -1006,19 +1027,63 @@ const Index = () => {
       return;
     }
 
-    const messageId = addBotMessage(`Sending NFT ${parameters.asset_id} to ${parameters.recipient.substring(0, 6)}...${parameters.recipient.substring(parameters.recipient.length - 4)}`, 'pending');
+    const quantity = parameters.amount ? Number(parameters.amount) : 1;
+    if (Number.isNaN(quantity) || quantity <= 0) {
+      addBotMessage('❌ Invalid quantity specified for NFT transfer.');
+      return;
+    }
+
+    const assetId = typeof parameters.asset_id === 'number'
+      ? parameters.asset_id
+      : parseInt(parameters.asset_id, 10);
+
+    let assetName: string | undefined =
+      parameters.asset_name ||
+      parameters.assetName ||
+      parameters.name ||
+      undefined;
+
+    if (!assetName) {
+      try {
+        const metadata = await transactionService.getAssetMetadata(assetId);
+        assetName = metadata?.name || metadata?.unitName || undefined;
+      } catch (error) {
+        console.warn('Failed to fetch asset metadata for display:', error);
+      }
+    }
+
+    const unitLabel = quantity === 1 ? 'NFT' : 'NFTs';
+    const messageId = addBotMessage(
+      `Sending ${quantity} ${unitLabel}${assetName ? ` "${assetName}"` : ''} (asset ID ${assetId}) to ${parameters.recipient.substring(0, 6)}...${parameters.recipient.substring(parameters.recipient.length - 4)}`,
+      'pending'
+    );
 
     try {
       const result = await transactionService.sendNFT(
         activeAddress!,
-        parameters.asset_id,
+        assetId,
         parameters.recipient,
-        transactionSigner!
+        transactionSigner!,
+        quantity,
+        assetName
       );
 
       await updateBalance();
       if (result.status === 'success') {
-        updateMessage(messageId, { content: result.message, status: 'success', txid: result.txid });
+        updateMessage(messageId, {
+          content: result.message,
+          status: 'success',
+          txid: result.txid,
+          widgetParams: {
+            type: 'nft_transfer',
+            assetId,
+            toAddress: parameters.recipient,
+            amount: quantity,
+            amountDisplay: `${quantity} ${unitLabel}`,
+            fee: '0.001 ALGO',
+            assetName,
+          },
+        });
       } else {
         const friendlyError = formatErrorMessage(result.error || result.message, 'NFT transfer');
         updateMessage(messageId, { content: friendlyError, status: 'error' });
