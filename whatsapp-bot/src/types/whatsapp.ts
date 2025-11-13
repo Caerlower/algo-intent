@@ -49,7 +49,7 @@ export interface WhatsAppMessage {
   from: string; // Phone number in E.164 format
   id: string; // Message ID
   timestamp: string; // Unix timestamp
-  type: 'text' | 'image' | 'video' | 'audio' | 'document' | 'location' | 'contacts';
+  type: 'text' | 'image' | 'video' | 'audio' | 'document' | 'location' | 'contacts' | 'interactive';
   text?: {
     body: string;
   };
@@ -74,6 +74,19 @@ export interface WhatsAppMessage {
     mime_type: string;
     filename?: string;
     caption?: string;
+  };
+  interactive?: {
+    type: 'button_reply' | 'list_reply';
+    button_reply?: {
+      id: string;
+      title: string;
+      payload?: string;
+    };
+    list_reply?: {
+      id: string;
+      title: string;
+      description?: string;
+    };
   };
   location?: {
     longitude: number;
@@ -121,6 +134,7 @@ export interface ExtractedMessage {
   mediaId?: string; // For media messages
   mediaType?: string; // MIME type for media
   caption?: string; // Caption for media messages
+  buttonId?: string; // For interactive button replies
 }
 
 /**
