@@ -11,6 +11,8 @@ export interface IntentParameters {
   description?: string;
   image_url?: string;
   asset_id?: number;
+  media_id?: string;
+  media_type?: string;
   // Trading parameters
   from_asset?: string;
   to_asset?: string;
