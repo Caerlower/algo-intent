@@ -281,7 +281,9 @@ export class TransactionService {
     sender: string,
     assetId: number,
     recipient: string,
-    signer: TransactionSigner | TransactionSignerAccount | undefined
+    signer: TransactionSigner | TransactionSignerAccount | undefined,
+    quantity = 1,
+    assetName?: string
   ): Promise<TransactionResult> {
     try {
       if (!this.isValidAddress(recipient)) {
@@ -294,22 +296,42 @@ export class TransactionService {
 
       const signerAccount = this.resolveSigner(signer, sender);
 
-      // Transfer NFT using algokit-utils
-      const result = await this.algorand.send.assetTransfer({
-        signer: signerAccount,
-        sender: sender,
-        receiver: recipient,
-        assetId: BigInt(assetId),
-        amount: 1n,
-        validityWindow: 60n,
-        maxRoundsToWaitForConfirmation: 20,
-      });
+      const algod = new algosdk.Algodv2(
+        this.algodConfig.token || '',
+        this.algodConfig.server,
+        this.algodConfig.port || ''
+      );
 
-      return {
-        status: 'success',
-        txid: result.txIds[0],
-        message: `✅ NFT transferred successfully! Asset ID: ${assetId} sent to ${recipient}`
-      };
+      let resolvedAssetName = assetName;
+      try {
+        const assetInfo = await algod.getAssetByID(assetId).do();
+        resolvedAssetName =
+          resolvedAssetName ||
+          assetInfo.params?.name ||
+          assetInfo.params?.unitName ||
+          undefined;
+      } catch (err) {
+        console.warn(`Unable to fetch asset ${assetId} metadata`, err);
+      }
+
+      const transferResult = await this.sendAsset(
+        sender,
+        assetId,
+        quantity,
+        recipient,
+        signerAccount,
+        resolvedAssetName
+      );
+
+      if (transferResult.status === 'success') {
+        return {
+          status: 'success',
+          txid: transferResult.txid,
+          message: '✅ NFT transferred successfully!',
+        };
+      }
+
+      return transferResult;
 
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -441,6 +463,24 @@ export class TransactionService {
         message: `❌ Asset transfer failed: ${message}`,
         error: message
       };
+    }
+  }
+
+  async getAssetMetadata(assetId: number): Promise<{ name?: string; unitName?: string } | null> {
+    try {
+      const algod = new algosdk.Algodv2(
+        this.algodConfig.token || '',
+        this.algodConfig.server,
+        this.algodConfig.port || ''
+      );
+      const assetInfo = await algod.getAssetByID(assetId).do();
+      return {
+        name: assetInfo.params?.name,
+        unitName: assetInfo.params?.unitName,
+      };
+    } catch (error) {
+      console.warn(`Failed to fetch metadata for asset ${assetId}`, error);
+      return null;
     }
   }
 
