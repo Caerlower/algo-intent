@@ -14,15 +14,62 @@ interface ChatMessageProps {
     toAsset?: string;
     amount?: number;
     fee?: string; // Store fee for transaction details
+    type?: string;
+    assetId?: number;
+    toAddress?: string;
+    amountDisplay?: string;
+    assetName?: string;
   };
   onSwapCompleted?: (result: any) => void;
   onSwapFailed?: (error: any) => void;
 }
 
 // Helper function to parse transaction details from content
-const parseTransactionDetails = (content: string, widgetParams?: { fromAsset?: string; toAsset?: string; amount?: number; fee?: string }) => {
+const shortenAddressInline = (address: string) => {
+  if (!address) return '';
+  if (address.includes('...')) return address;
+  if (address.length <= 10) return address;
+  return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
+};
+
+const parseTransactionDetails = (
+  content: string,
+  widgetParams?: {
+    fromAsset?: string;
+    toAsset?: string;
+    amount?: number;
+    fee?: string;
+    type?: string;
+    assetId?: number;
+    toAddress?: string;
+    amountDisplay?: string;
+    assetName?: string;
+    to?: string;
+  }
+) => {
   const details: Record<string, any> = {};
   if (!content) return null;
+
+  if (widgetParams?.type === 'nft_transfer') {
+    const amountLabel =
+      widgetParams.amountDisplay ??
+      `${widgetParams.amount ?? 1} NFT${(widgetParams.amount ?? 1) === 1 ? '' : 's'}`;
+    details.amount = amountLabel;
+    if (widgetParams.toAddress) {
+      details.to = shortenAddressInline(widgetParams.toAddress);
+    }
+    if (widgetParams.assetId !== undefined) {
+      details.assetId = widgetParams.assetId.toString();
+    }
+    if (widgetParams.assetName) {
+      details.assetName = widgetParams.assetName;
+    }
+    if (widgetParams.fee) {
+      details.fee = widgetParams.fee;
+    }
+    details.nftTransfer = true;
+    return details;
+  }
 
   if (/executing atomic transaction|atomic transaction successful|atomic transaction failed/i.test(content)) {
     const transfers = [...content.matchAll(/(?:send|sent)\s+([\d.,]+)\s+([A-Za-z0-9]+)\s+to\s+([A-Z0-9.]+)/gi)];
@@ -57,7 +104,7 @@ const parseTransactionDetails = (content: string, widgetParams?: { fromAsset?: s
     if (assetSymbol !== 'ALGO') {
       details.amount = `${amount} ${assetSymbol}`;
       const recipient = assetSendMatch[3].replace(/[.,]+$/, '');
-      details.to = recipient.includes('...') ? recipient : `${recipient.substring(0, 6)}...${recipient.substring(recipient.length - 4)}`;
+      details.to = shortenAddressInline(recipient);
       details.fee = details.fee || '0.001 ALGO';
     }
   }
@@ -128,6 +175,50 @@ const parseTransactionDetails = (content: string, widgetParams?: { fromAsset?: s
     return Object.keys(details).length > 0 ? details : null;
   }
   
+  // Detect NFT transfer intents/success messages
+  const nftSendingMatch = content.match(/sending\s+([\d.,]+)\s+nfts?\s*(?:"([^"]+)")?\s*\(asset id\s*(\d+)\)\s+to\s+([A-Z0-9.]+)/i);
+  if (nftSendingMatch) {
+    const quantity = nftSendingMatch[1].replace(/,/g, '');
+    const assetName = nftSendingMatch[2];
+    const assetId = nftSendingMatch[3];
+    const rawRecipient = nftSendingMatch[4].replace(/[.,]+$/, '');
+    const quantityNumber = Number(quantity);
+    const unitLabel = quantityNumber === 1 ? 'NFT' : 'NFTs';
+
+    details.amount = `${quantity} ${unitLabel}`;
+    if (assetName) {
+      details.assetName = assetName;
+    }
+    details.assetId = assetId;
+    details.to = rawRecipient.includes('...') ? rawRecipient : `${rawRecipient.substring(0, 6)}...${rawRecipient.substring(rawRecipient.length - 4)}`;
+    details.fee = details.fee || '0.001 ALGO';
+    details.nftTransfer = true;
+    return details;
+  }
+
+  if (widgetParams?.type === 'nft_transfer') {
+    if (!details.amount && (widgetParams.amountDisplay || widgetParams.amount !== undefined)) {
+      details.amount =
+        widgetParams.amountDisplay ||
+        `${widgetParams.amount} NFT${widgetParams.amount === 1 ? '' : 's'}`;
+    }
+    if (!details.to) {
+      const addr = widgetParams.to ?? widgetParams.toAddress;
+      if (addr) details.to = shortenAddressInline(addr);
+    }
+    if (!details.assetId && widgetParams.assetId !== undefined) {
+      details.assetId = widgetParams.assetId.toString();
+    }
+    if (!details.assetName && widgetParams.assetName) {
+      details.assetName = widgetParams.assetName;
+    }
+    if (!details.fee && widgetParams.fee) {
+      details.fee = widgetParams.fee;
+    }
+    details.nftTransfer = true;
+    return details;
+  }
+
   // Check if this is a balance check (not a transaction, so no fees)
   const isBalanceCheck = /balance|checking balance|balance:/i.test(content) && !/sent|sending|transfer|swap|nft|created/i.test(content);
   
@@ -151,6 +242,7 @@ const parseTransactionDetails = (content: string, widgetParams?: { fromAsset?: s
   const isNFTCreation = /nft.*created|created.*nft|asset id|asset id:/i.test(content);
   
   if (isNFTCreation) {
+    details.nftCreation = true;
     // Extract Asset ID: "Asset ID: 748981539" or "Asset ID:748981539"
     const assetIdMatch = content.match(/Asset\s*ID:\s*(\d+)/i);
     if (assetIdMatch) {
@@ -248,7 +340,7 @@ const parseTransactionDetails = (content: string, widgetParams?: { fromAsset?: s
   }
   
   // Fee is typically 0.001 ALGO for basic transactions
-  if (details.amount && !details.fee) {
+  if ((details.amount || details.assetId) && !details.fee) {
     details.fee = "0.001 ALGO";
   }
   
@@ -260,8 +352,12 @@ const ChatMessage = ({ role, content, status, txid, imageUrl, isPendingImage, wi
   const transactionDetails = role === "assistant" ? parseTransactionDetails(content, widgetParams) : null;
   const isSwap = transactionDetails?.fromAmount && transactionDetails?.toAmount;
   const isBalanceCheck = transactionDetails?.balance !== undefined || transactionDetails?.assets !== undefined;
-  const isNFTCreation = transactionDetails?.assetId !== undefined || transactionDetails?.name !== undefined;
+  const isNFTCreation = Boolean(transactionDetails?.nftCreation);
+  const isNftTransfer = Boolean(transactionDetails?.nftTransfer);
   const isPriceCheck = transactionDetails?.priceEntries !== undefined;
+  const displayName = transactionDetails
+    ? transactionDetails.assetName ?? transactionDetails.name
+    : undefined;
   
   // Parse price entries if present
   let priceEntries: Array<{ symbol: string; price: string; change: string }> = [];
@@ -300,6 +396,18 @@ const ChatMessage = ({ role, content, status, txid, imageUrl, isPendingImage, wi
     } else {
       // Fallback: show up to "Asset ID:" or "Name:"
       mainContent = content.split(/Asset\s*ID:|Name:/i)[0].trim();
+    }
+  } else if (isNftTransfer && status === 'success') {
+    const transferMatch = content.match(/^(.*?successfully!)/i);
+    if (transferMatch) {
+      mainContent = transferMatch[1].trim();
+    } else {
+      const prefix = content.match(/^[^:]+:/i);
+      if (prefix?.[0]) {
+        mainContent = prefix[0].replace(/:$/, '').trim();
+      } else {
+        mainContent = content;
+      }
     }
   }
   
@@ -454,10 +562,10 @@ const ChatMessage = ({ role, content, status, txid, imageUrl, isPendingImage, wi
             ) : isNFTCreation ? (
               <>
                 {/* NFT creation details */}
-                {transactionDetails.name && (
+                {displayName && (
                   <div className="flex justify-between mb-2">
                     <span className="text-base text-muted-foreground">Name:</span>
-                    <span className="text-base font-semibold text-foreground">{transactionDetails.name}</span>
+                    <span className="text-base font-semibold text-foreground">{displayName}</span>
                   </div>
                 )}
                 {transactionDetails.assetId && (
@@ -514,6 +622,18 @@ const ChatMessage = ({ role, content, status, txid, imageUrl, isPendingImage, wi
                         ? `${transactionDetails.to.substring(0, 6)}...${transactionDetails.to.substring(transactionDetails.to.length - 4)}`
                         : transactionDetails.to}
                     </span>
+                  </div>
+                )}
+                {displayName && (
+                  <div className="flex justify-between mb-2">
+                    <span className="text-base text-muted-foreground">Name:</span>
+                    <span className="text-base font-semibold text-foreground">{displayName}</span>
+                  </div>
+                )}
+                {transactionDetails.assetId && (
+                  <div className="flex justify-between mb-2">
+                    <span className="text-base text-muted-foreground">Asset ID:</span>
+                    <span className="text-base font-semibold text-foreground font-mono">{transactionDetails.assetId}</span>
                   </div>
                 )}
                 {transactionDetails.fee && (
