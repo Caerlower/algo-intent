@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { useWallet } from '@txnlab/use-wallet-react';
 import { TradingService } from '../services/tradingService';
 import { useNetwork } from '../providers/NetworkProvider';
 import { getAlgodConfigForNetwork } from '../utils/network/getAlgoClientConfigs';
 import { cn } from "@/lib/utils";
+import { useEnhancedWallet } from '../providers/EnhancedWalletProvider';
 
 interface SwapWidgetProps {
   fromAsset?: string;
@@ -30,7 +30,7 @@ const getAssetMeta = (symbol: string, network: 'testnet' | 'mainnet') => {
 };
 
 const SwapWidget: React.FC<SwapWidgetProps> = ({ fromAsset, toAsset, amount, onSwapCompleted, onSwapFailed }) => {
-  const { activeAddress, signTransactions, transactionSigner } = useWallet();
+  const { activeAddress, signTransactions, transactionSigner, isConnected } = useEnhancedWallet();
   const { network } = useNetwork();
   
   // Get algod config based on selected network
@@ -216,7 +216,7 @@ const SwapWidget: React.FC<SwapWidgetProps> = ({ fromAsset, toAsset, amount, onS
                   Swap successful! <a href={`https://lora.algokit.io/${network}/transaction/${swapResult.txid}`} target="_blank" rel="noopener noreferrer" className="text-primary underline">View on Explorer</a>
                 </div>
               )}
-      {!activeAddress && <div className="text-red-600 mt-2 text-center text-xs font-medium">Connect your wallet to swap</div>}
+      {!isConnected && <div className="text-red-600 mt-2 text-center text-xs font-medium">Connect your wallet to swap</div>}
     </div>
   );
 };
