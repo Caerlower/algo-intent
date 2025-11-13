@@ -67,6 +67,18 @@ export function extractMessage(body: any): ExtractedMessage | null {
       mediaId = message.document.id;
       mediaType = message.document.mime_type;
       caption = message.document.caption;
+    } else if (message.type === 'interactive' && message.interactive) {
+      if (message.interactive.button_reply) {
+        const buttonReply = message.interactive.button_reply;
+        messageText = buttonReply.payload || buttonReply.title || null;
+        caption = buttonReply.title;
+        mediaId = buttonReply.id;
+      } else if (message.interactive.list_reply) {
+        const listReply = message.interactive.list_reply;
+        messageText = listReply.description || listReply.title || null;
+        caption = listReply.title;
+        mediaId = listReply.id;
+      }
     }
 
     return {
@@ -78,6 +90,7 @@ export function extractMessage(body: any): ExtractedMessage | null {
       mediaId,
       mediaType,
       caption,
+      buttonId: message.interactive?.button_reply?.id,
     };
   } catch (error) {
     console.error('Error extracting message:', error);
