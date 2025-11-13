@@ -12,7 +12,7 @@ This bot allows users to interact with the Algorand blockchain through WhatsApp 
 ## 🏗️ Architecture
 
 ```
-WhatsApp → Meta Cloud API → Express Webhook → Redis Queue → Worker → AlgoIntent Engine → Vault → Algorand
+WhatsApp → Meta Cloud API → Express Webhook → Message Processor → AlgoIntent Engine → Wallet → Algorand
 ```
 
 ## 📋 Prerequisites
