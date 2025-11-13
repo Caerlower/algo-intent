@@ -6,7 +6,7 @@
 import { Request, Response, Router } from 'express';
 import { extractMessage, isValidWebhookPayload } from './extractMessage';
 import { WebhookVerificationQuery } from '../types/whatsapp';
-import { addMessageToQueue } from '../queue/queue';
+import { processIncomingMessage } from '../messageProcessor';
 
 const router = Router();
 
@@ -45,13 +45,11 @@ router.get('/webhook', (req: Request, res: Response) => {
 /**
  * POST /webhook
  * Receives incoming WhatsApp messages from Meta
- * 
- * Processes messages asynchronously:
- * 1. Extracts message data safely
- * 2. Pushes message to Redis queue for async processing
- * 3. Returns 200 OK immediately to Meta
- * 
- * The worker process will handle actual message processing
+ *
+ * Processes messages by:
+ * 1. Extracting message data safely
+ * 2. Returning 200 OK immediately to Meta to stop retries
+ * 3. Handling the message asynchronously via the in-process message processor
  */
 router.post('/webhook', async (req: Request, res: Response) => {
   // Always return 200 OK immediately to Meta
@@ -88,15 +86,10 @@ router.post('/webhook', async (req: Request, res: Response) => {
     console.log(`📨 Incoming ${messageType} from ${phoneDisplay}`);
   }
 
-  // Push message to queue for async processing
-  try {
-    const jobId = await addMessageToQueue(extractedMessage);
-    console.log(`📤 Message queued for processing: Job ${jobId}`);
-  } catch (error) {
-    console.error('❌ Failed to queue message:', error);
-    // Note: We already returned 200 OK, so Meta won't retry
-    // In production, you might want to log this to a monitoring service
-  }
+  // Process message synchronously (after responding to Meta)
+  processIncomingMessage(extractedMessage).catch((error) => {
+    console.error('❌ Error while processing message:', error);
+  });
 });
 
 export default router;
