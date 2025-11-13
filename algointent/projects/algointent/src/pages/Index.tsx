@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useTheme } from "next-themes";
 import { useEnhancedWallet } from '../providers/EnhancedWalletProvider';
 import { useNetwork } from '../providers/NetworkProvider';
@@ -18,6 +18,7 @@ import WalletConnectButton from "@/components/WalletConnectButton";
 import SwapWidget from "@/components/SwapWidget";
 import { NetworkToggle } from "@/components/NetworkToggle";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Menu, Moon, Sun, X, AlertTriangle } from "lucide-react";
 import { MainnetWarning } from "@/components/MainnetWarning";
 
@@ -76,7 +77,17 @@ const Index = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
   
-  const { activeAddress, transactionSigner, signTransactions, isGoogleConnected, googleUser, googleWallet } = useEnhancedWallet();
+  const {
+    activeAddress,
+    transactionSigner,
+    signTransactions,
+    isGoogleConnected,
+    googleUser,
+    googleWallet,
+    pendingApproval,
+    approvePendingApproval,
+    rejectPendingApproval,
+  } = useEnhancedWallet();
   const { theme, setTheme } = useTheme();
   const { network, isMainnet, setNetwork } = useNetwork();
 
@@ -137,6 +148,14 @@ const Index = () => {
     }, 100);
   }, [messages]);
 
+  useEffect(() => {
+    if (pendingApproval && messagesEndRef.current) {
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 50);
+    }
+  }, [pendingApproval]);
+
   // Persist chat in sessionStorage so history is not lost during interactions
   useEffect(() => {
     try {
@@ -193,6 +212,128 @@ const Index = () => {
 
   const addBotMessage = (content: string, status?: 'pending' | 'success' | 'error', txid?: string) => {
     return addMessage('assistant', content, status, txid);
+  };
+
+  const formatMicroAlgo = (amount?: bigint | number) => {
+    if (amount === undefined) return '—';
+    const micro = typeof amount === 'number' ? amount : Number(amount);
+    return `${(micro / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 6 })} ALGO`;
+  };
+
+  const formatAmount = (amount?: bigint | number) => {
+    if (amount === undefined) return '—';
+    const value = typeof amount === 'number' ? amount : Number(amount);
+    return value.toLocaleString(undefined, { maximumFractionDigits: 6 });
+  };
+
+  const shortenAddress = (address?: string) => {
+    if (!address) return '—';
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  };
+
+  const getTransactionTypeLabel = (txn: algosdk.Transaction) => {
+    switch (txn.type) {
+      case 'pay':
+        return 'Payment';
+      case 'axfer':
+        return 'Asset Transfer';
+      case 'appl':
+        return 'Application Call';
+      default:
+        return txn.type.toUpperCase();
+    }
+  };
+
+  const KNOWN_ASSET_INFO = useMemo(
+    () =>
+      ({
+        0: { symbol: 'ALGO', decimals: 6 },
+        10458941: { symbol: 'USDC', decimals: 6 },
+        31566704: { symbol: 'USDC', decimals: 6 },
+        10458942: { symbol: 'USDT', decimals: 6 },
+        312769: { symbol: 'USDT', decimals: 6 },
+      }) as Record<number, { symbol: string; decimals: number }>,
+    []
+  );
+
+  const formatAmountWithDecimals = useCallback((rawAmount: number | bigint, decimals: number) => {
+    if (decimals <= 0) return typeof rawAmount === 'bigint' ? rawAmount.toString() : String(rawAmount);
+    const divisor = BigInt(10) ** BigInt(decimals);
+    const rawBig = typeof rawAmount === 'bigint' ? rawAmount : BigInt(Math.trunc(rawAmount));
+    const intPart = rawBig / divisor;
+    const fracPart = rawBig % divisor;
+    if (fracPart === 0n) return intPart.toString();
+    const fracStr = fracPart.toString().padStart(decimals, '0').replace(/0+$/, '');
+    return `${intPart.toString()}.${fracStr}`;
+  }, []);
+
+  const formatAssetTransferAmount = useCallback(
+    (rawAmount: number | bigint, assetId?: number): string => {
+      const amountIsZero =
+        (typeof rawAmount === 'bigint' ? rawAmount === 0n : Number(rawAmount) === 0);
+      if (amountIsZero) return '0';
+      const info = assetId !== undefined ? KNOWN_ASSET_INFO[assetId] : undefined;
+      const decimals = info?.decimals ?? 6;
+      const symbol = info?.symbol ?? (assetId !== undefined ? `Asset ${assetId}` : 'units');
+      return `${formatAmountWithDecimals(rawAmount, decimals)} ${symbol}`;
+    },
+    [KNOWN_ASSET_INFO, formatAmountWithDecimals]
+  );
+
+  const buildApprovalDetails = (txn: algosdk.Transaction) => {
+    const details: { label: string; value: string }[] = [];
+
+    if (txn.type === 'pay' && txn.payment) {
+      details.push({ label: 'Amount', value: formatMicroAlgo(txn.payment.amount) });
+      details.push({ label: 'To', value: shortenAddress(txn.payment.receiver?.toString()) });
+      details.push({ label: 'Fee', value: formatMicroAlgo(txn.fee) });
+    } else if (txn.type === 'axfer' && txn.assetTransfer) {
+      const assetId = Number(txn.assetTransfer.assetIndex ?? 0);
+      const sender = txn.sender?.toString() ?? '';
+      const receiver = txn.assetTransfer.receiver?.toString() ?? '';
+      const rawAmount = txn.assetTransfer.amount as number | bigint;
+      const amountIsZero = typeof rawAmount === 'bigint' ? rawAmount === 0n : rawAmount === 0;
+      const isOptIn = Boolean(sender && receiver && sender === receiver && amountIsZero);
+
+      if (isOptIn) {
+        details.push({ label: 'Action', value: 'Asset Opt-In' });
+        details.push({ label: 'Asset ID', value: assetId ? assetId.toString() : '—' });
+      } else {
+        details.push({
+          label: 'Amount',
+          value: formatAssetTransferAmount(txn.assetTransfer.amount, assetId),
+        });
+        details.push({ label: 'To', value: shortenAddress(receiver) });
+        details.push({ label: 'Asset ID', value: assetId ? assetId.toString() : '—' });
+      }
+      details.push({ label: 'Fee', value: formatMicroAlgo(txn.fee) });
+    } else if (txn.type === 'appl' && txn.applicationCall) {
+      details.push({ label: 'App ID', value: txn.applicationCall.appIndex?.toString() ?? '—' });
+      details.push({ label: 'On Complete', value: txn.applicationCall.onComplete?.toString() ?? '—' });
+      details.push({ label: 'Fee', value: formatMicroAlgo(txn.fee) });
+    } else {
+      details.push({ label: 'Fee', value: formatMicroAlgo(txn.fee) });
+    }
+
+    if (
+      txn.note &&
+      txn.note.length > 0 &&
+      !details.some((d) => d.label === 'Note')
+    ) {
+      try {
+        const decodedNote = new TextDecoder().decode(txn.note);
+        if (decodedNote.trim().length > 0) {
+          details.push({ label: 'Note', value: decodedNote });
+        }
+      } catch {
+        const noteString = Array.from(txn.note)
+          .map((byte) => String.fromCharCode(byte))
+          .join('');
+        details.push({ label: 'Note', value: btoa(noteString) });
+      }
+    }
+
+    return details;
   };
 
   const updateMessage = (messageId: string, updates: Partial<Message>) => {
@@ -318,7 +459,12 @@ const Index = () => {
     const errorMessage = error instanceof Error ? error.message : String(error || 'Unknown error');
     
     // Handle common error patterns and make them user-friendly
-    if (errorMessage.includes('rejected') || errorMessage.includes('user has rejected')) {
+    if (
+      errorMessage.includes('rejected') ||
+      errorMessage.includes('user has rejected') ||
+      errorMessage.includes('cancelled_by_user') ||
+      errorMessage.toLowerCase().includes('cancelled by the user')
+    ) {
       return `Transaction cancelled. The transaction was not approved in your wallet.`;
     }
     if (errorMessage.includes('Confirmation Failed') || errorMessage.includes('4100')) {
@@ -326,6 +472,15 @@ const Index = () => {
     }
     if (errorMessage.includes('insufficient') || errorMessage.includes('balance')) {
       return `Insufficient balance. Please check your wallet balance and try again.`;
+    }
+    if (errorMessage.includes('sender_not_opted_in')) {
+      return `You must opt in to this asset before you can send it.`;
+    }
+    if (errorMessage.includes('recipient_not_opted_in')) {
+      return `Recipient must opt in to this asset before they can receive it.`;
+    }
+    if (errorMessage.includes('insufficient_asset_balance')) {
+      return `Insufficient asset balance. Please check your holdings and try again.`;
     }
     if (errorMessage.includes('Invalid') && errorMessage.includes('address')) {
       return `Invalid address format. Please check the recipient address and try again.`;
@@ -351,23 +506,30 @@ const Index = () => {
         addBotMessage(sanitizeBotText(multiIntent.explanation));
       }
       
-      // Check if all intents can be executed atomically
       const atomicCompatibleIntents = ['send_algo', 'send_asset', 'opt_in', 'opt_out', 'send_nft'];
-      const canExecuteAtomically = multiIntent.intents.every(
-        singleIntent => atomicCompatibleIntents.includes(singleIntent.intent)
-      );
-      
-      if (canExecuteAtomically && multiIntent.intents.length > 1) {
-        // Execute atomically
-        await handleAtomicIntents(multiIntent.intents);
-      } else {
-        // Execute sequentially (for non-atomic compatible intents or single intent)
-        for (const singleIntent of multiIntent.intents) {
-          await handleSingleIntent(singleIntent, file);
-          // Small delay between actions to ensure proper sequencing
-          await new Promise(resolve => setTimeout(resolve, 500));
+      const flushAtomicQueue = async (queue: ParsedIntent[]) => {
+        if (queue.length === 0) return;
+        if (queue.length === 1) {
+          await handleSingleIntent(queue[0], file);
+        } else {
+          await handleAtomicIntents(queue);
         }
+        queue.length = 0;
+      };
+
+      const atomicQueue: ParsedIntent[] = [];
+      for (const singleIntent of multiIntent.intents) {
+        if (atomicCompatibleIntents.includes(singleIntent.intent)) {
+          atomicQueue.push(singleIntent);
+          continue;
+        }
+
+        await flushAtomicQueue(atomicQueue);
+        await handleSingleIntent(singleIntent, file);
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
+
+      await flushAtomicQueue(atomicQueue);
       return;
     }
     
@@ -582,6 +744,9 @@ const Index = () => {
       case 'send_algo':
         await handleSendAlgo(parameters);
         break;
+      case 'send_asset':
+        await handleSendAsset(parameters);
+        break;
       case 'create_nft':
         await handleCreateNFT(parameters, file);
         break;
@@ -652,6 +817,84 @@ const Index = () => {
     } catch (error) {
       // Update same message with user-friendly error status
       const friendlyError = formatErrorMessage(error, 'Transaction');
+      updateMessage(messageId, {
+        content: friendlyError,
+        status: 'error'
+      });
+    }
+  };
+
+  const handleSendAsset = async (parameters: any) => {
+    if (!activeAddress || !algosdk.isValidAddress(activeAddress)) {
+      addBotMessage('❌ Your wallet address is not valid. Please reconnect your wallet.');
+      return;
+    }
+    if (!parameters.recipient || !parameters.amount) {
+      addBotMessage('❌ Missing recipient or amount for asset transfer.');
+      return;
+    }
+
+    const amount = Number(parameters.amount);
+    if (Number.isNaN(amount) || amount <= 0) {
+      addBotMessage('❌ Invalid amount for asset transfer.');
+      return;
+    }
+
+    let assetName = parameters.asset_name || '';
+    let assetId: number | undefined = parameters.asset_id
+      ? typeof parameters.asset_id === 'number'
+        ? parameters.asset_id
+        : parseInt(parameters.asset_id, 10)
+      : undefined;
+
+    if (assetName) {
+      const upper = assetName.toUpperCase();
+      if (upper === 'USDC') {
+        assetId = network === 'mainnet' ? 31566704 : 10458941;
+        assetName = 'USDC';
+      } else if (upper === 'USDT') {
+        assetId = network === 'mainnet' ? 312769 : 10458942;
+        assetName = 'USDT';
+      } else {
+        assetName = upper;
+      }
+    }
+
+    if (!assetId || Number.isNaN(assetId)) {
+      addBotMessage('❌ Asset ID is required to send a token.');
+      return;
+    }
+
+    const recipientDisplay = `${parameters.recipient.substring(0, 6)}...${parameters.recipient.substring(parameters.recipient.length - 4)}`;
+    const messageId = addBotMessage(`Sending ${amount} ${assetName || `asset ${assetId}`} to ${recipientDisplay}`, 'pending');
+
+    try {
+      const result = await transactionService.sendAsset(
+        activeAddress,
+        assetId,
+        amount,
+        parameters.recipient,
+        transactionSigner!,
+        assetName
+      );
+
+      await updateBalance();
+
+      if (result.status === 'success') {
+        updateMessage(messageId, {
+          content: result.message,
+          status: 'success',
+          txid: result.txid
+        });
+      } else {
+        const friendlyError = formatErrorMessage(result.error || result.message, 'Asset transfer');
+        updateMessage(messageId, {
+          content: friendlyError,
+          status: 'error'
+        });
+      }
+    } catch (error) {
+      const friendlyError = formatErrorMessage(error, 'Asset transfer');
       updateMessage(messageId, {
         content: friendlyError,
         status: 'error'
@@ -906,6 +1149,7 @@ const Index = () => {
       toAsset: parameters.to_asset,
       amount: parameters.amount,
     });
+
   };
 
   const handleSetLimitOrder = async (parameters: any) => {
@@ -1204,6 +1448,62 @@ const Index = () => {
                     }}
                   />
                 ))}
+                {pendingApproval && pendingApproval.length > 0 && (
+                  <div className="flex justify-end">
+                    <div className="max-w-[85%] sm:max-w-[80%]">
+                      <div className="bg-card border border-primary/20 rounded-xl sm:rounded-2xl px-4 py-4 shadow-sm space-y-4">
+                        <div className="flex items-start gap-3">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
+                            <AlertTriangle className="h-4 w-4" />
+                          </div>
+                          <div>
+                            <p className="text-base font-semibold text-foreground">Approval required</p>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              Review transaction details before signing.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="p-3 bg-primary/5 rounded-lg border border-primary/10 space-y-3">
+                          {pendingApproval.map((txn, txnIndex) => (
+                            <div key={txnIndex} className={txnIndex < pendingApproval.length - 1 ? "pb-3 border-b border-primary/10" : ""}>
+                              <div className="flex justify-between mb-2">
+                                <span className="text-base text-muted-foreground">Type:</span>
+                                <span className="text-base font-semibold text-foreground">
+                                  {getTransactionTypeLabel(txn)}
+                                </span>
+                              </div>
+                              {buildApprovalDetails(txn).map((row, index) => (
+                                <div key={index} className="flex justify-between">
+                                  <span className="text-base text-muted-foreground">{row.label}:</span>
+                                  <span
+                                    className={cn(
+                                      "text-base font-semibold text-foreground",
+                                      row.label === 'To' ? "font-mono" : ""
+                                    )}
+                                  >
+                                    {row.value}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex gap-3">
+                          <Button
+                            variant="outline"
+                            onClick={rejectPendingApproval}
+                            className="flex-1"
+                          >
+                            Reject
+                          </Button>
+                          <Button onClick={approvePendingApproval} className="flex-1">
+                            Approve
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {isProcessing && (
                   <div className="flex justify-start">
                     <div className="bg-card border border-border rounded-2xl px-4 py-3 shadow-sm">
