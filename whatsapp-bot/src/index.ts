@@ -6,7 +6,7 @@
  * Flow:
  * 1. Receives webhooks from Meta (GET for verification, POST for messages)
  * 2. Validates and extracts message data
- * 3. Logs messages (later: pushes to queue for async processing)
+ * 3. Logs messages and processes them synchronously
  * 4. Processes intents via AlgoIntent engine
  * 5. Executes Algorand transactions via Hashi + Vault
  * 6. Sends replies back to users via WhatsApp
@@ -16,27 +16,21 @@ import express, { Express } from 'express';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
 import webhookRouter from './webhook/webhook';
+import {
+  getActiveMessageCount,
+  markMessageProcessorShuttingDown,
+  waitForMessageProcessingToComplete,
+} from './messageProcessor';
 
 // Load environment variables from .env file
 dotenv.config();
-
-// Import worker AFTER dotenv.config() to ensure env vars are loaded
-// This will execute the worker.ts module and start the worker
-import messageWorker from './queue/worker';
-
-// Verify worker was imported
-if (!messageWorker) {
-  console.error('❌ Worker module failed to import!');
-  process.exit(1);
-}
-
-console.log('✅ Worker module imported and initialized');
 
 /**
  * Initialize Express application
  */
 const app: Express = express();
 const PORT = process.env.PORT || 3001;
+let isShuttingDown = false;
 
 // Middleware configuration
 // Parse JSON bodies (Meta sends JSON webhooks)
@@ -69,22 +63,21 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
   res.status(500).json({ error: 'Internal server error' });
 });
 
-// Start server
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log('🚀 AlgoIntent WhatsApp Bot server started');
   console.log(`📡 Listening on port ${PORT}`);
   console.log(`🔗 Webhook URL: http://localhost:${PORT}/webhook`);
   console.log(`✅ Health check: http://localhost:${PORT}/health`);
-  
+
   // Validate required environment variables
   const requiredEnvVars = [
     'WHATSAPP_ACCESS_TOKEN',
     'WHATSAPP_VERIFY_TOKEN',
-    'WHATSAPP_PHONE_NUMBER_ID'
+    'WHATSAPP_PHONE_NUMBER_ID',
   ];
-  
-  const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
-  
+
+  const missingVars = requiredEnvVars.filter((varName) => !process.env[varName]);
+
   if (missingVars.length > 0) {
     console.warn('⚠️ Missing environment variables:', missingVars.join(', '));
     console.warn('⚠️ Please check your .env file');
@@ -94,35 +87,59 @@ app.listen(PORT, () => {
     console.log(`🔐 App ID: ${process.env.WHATSAPP_APP_ID || 'Not set'}`);
   }
 
-  // Check Redis URL
-  if (process.env.REDIS_URL) {
-    console.log(`✅ Redis URL configured: ${process.env.REDIS_URL.substring(0, 30)}...`);
-  } else {
-    console.warn('⚠️ REDIS_URL not set, using default: redis://localhost:6379');
-  }
-
   // Check Perplexity API Key
   if (process.env.PERPLEXITY_API_KEY) {
     console.log('✅ Intent Engine configured (Perplexity API)');
   } else {
     console.warn('⚠️ PERPLEXITY_API_KEY not set - intent parsing will not work');
   }
-
-  // Worker is automatically started when imported
-  // It will process messages from the queue
-  console.log('👷 Message worker is running and ready to process jobs');
 });
+
+async function shutdown(signal: string) {
+  if (isShuttingDown) {
+    console.log(`🔁 ${signal} received, shutdown already in progress`);
+    return;
+  }
+
+  isShuttingDown = true;
+
+  console.log(`🛑 ${signal} received, shutting down gracefully`);
+
+  markMessageProcessorShuttingDown();
+
+  await new Promise<void>((resolve) => {
+    server.close((error?: Error) => {
+      if (error) {
+        console.error('❌ Error closing HTTP server:', error);
+      } else {
+        console.log('✅ HTTP server closed to new connections');
+      }
+      resolve();
+    });
+  });
+
+  const timeoutEnv = process.env.SHUTDOWN_TIMEOUT_MS
+    ? Number(process.env.SHUTDOWN_TIMEOUT_MS)
+    : undefined;
+  const timeoutMs =
+    typeof timeoutEnv === 'number' && !Number.isNaN(timeoutEnv) && timeoutEnv > 0
+      ? timeoutEnv
+      : 10_000;
+
+  await waitForMessageProcessingToComplete(timeoutMs);
+
+  const remaining = getActiveMessageCount();
+  if (remaining > 0) {
+    console.warn(`⚠️ Exiting with ${remaining} message(s) still processing.`);
+  } else {
+    console.log('✅ All message processing completed.');
+  }
+
+  console.log('👋 Shutdown complete. Exiting process.');
+  process.exit(0);
+}
 
 // Graceful shutdown
-process.on('SIGTERM', async () => {
-  console.log('🛑 SIGTERM received, shutting down gracefully');
-  // Worker handles its own shutdown
-  process.exit(0);
-});
-
-process.on('SIGINT', async () => {
-  console.log('🛑 SIGINT received, shutting down gracefully');
-  // Worker handles its own shutdown
-  process.exit(0);
-});
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
