@@ -21,8 +21,47 @@ interface ChatMessageProps {
 
 // Helper function to parse transaction details from content
 const parseTransactionDetails = (content: string, widgetParams?: { fromAsset?: string; toAsset?: string; amount?: number; fee?: string }) => {
-  const details: { [key: string]: string } = {};
-  
+  const details: Record<string, any> = {};
+  if (!content) return null;
+
+  if (/executing atomic transaction|atomic transaction successful|atomic transaction failed/i.test(content)) {
+    const transfers = [...content.matchAll(/(?:send|sent)\s+([\d.,]+)\s+([A-Za-z0-9]+)\s+to\s+([A-Z0-9.]+)/gi)];
+    if (transfers.length > 0) {
+      details.atomicTransfers = transfers.map(match => {
+        const amount = match[1].replace(/,/g, '');
+        const asset = match[2].toUpperCase();
+        const to = match[3].replace(/[.,]+$/, '');
+        return {
+          displayAmount: `${amount} ${asset}`,
+          amount,
+          asset,
+          to,
+        };
+      });
+      const feeMatch = content.match(/total fee:\s*([\d.]+)\s*ALGO/i);
+      if (feeMatch) {
+        details.fee = `${feeMatch[1]} ALGO`;
+      } else {
+        const totalFee = (transfers.length * 0.001).toLocaleString(undefined, { maximumFractionDigits: 6 });
+        details.fee = `${totalFee} ALGO`;
+      }
+      return details;
+    }
+  }
+
+  // Detect single asset transfers (non-atomic) such as USDC
+  const assetSendMatch = content.match(/(?:sending|send|sent)\s+([\d.,]+)\s+([A-Z0-9]+)\s+to\s+([A-Z0-9.]+)/i);
+  if (assetSendMatch) {
+    const amount = assetSendMatch[1].replace(/,/g, '');
+    const assetSymbol = assetSendMatch[2].toUpperCase();
+    if (assetSymbol !== 'ALGO') {
+      details.amount = `${amount} ${assetSymbol}`;
+      const recipient = assetSendMatch[3].replace(/[.,]+$/, '');
+      details.to = recipient.includes('...') ? recipient : `${recipient.substring(0, 6)}...${recipient.substring(recipient.length - 4)}`;
+      details.fee = details.fee || '0.001 ALGO';
+    }
+  }
+
   // Check if this is a price check
   const isPriceCheck = /current market prices|fetching.*prices|price/i.test(content) && !/sent|sending|transfer|swap|nft|created|balance/i.test(content);
   
@@ -126,7 +165,9 @@ const parseTransactionDetails = (content: string, widgetParams?: { fromAsset?: s
     
     // NFT creation typically has a fee of 0.001 ALGO
     if (details.assetId || details.name) {
-      details.fee = "0.001 ALGO";
+      if (!details.fee) {
+        details.fee = "0.001 ALGO";
+      }
     }
     
     return Object.keys(details).length > 0 ? details : null;
@@ -167,7 +208,7 @@ const parseTransactionDetails = (content: string, widgetParams?: { fromAsset?: s
     // Extract fee from widget params (stored there after swap completion) or use default
     if (widgetParams?.fee) {
       details.fee = widgetParams.fee;
-    } else {
+    } else if (!details.fee) {
       details.fee = "0.001 ALGO"; // Default swap fee
     }
     
@@ -207,7 +248,7 @@ const parseTransactionDetails = (content: string, widgetParams?: { fromAsset?: s
   }
   
   // Fee is typically 0.001 ALGO for basic transactions
-  if (details.amount) {
+  if (details.amount && !details.fee) {
     details.fee = "0.001 ALGO";
   }
   
@@ -233,7 +274,7 @@ const ChatMessage = ({ role, content, status, txid, imageUrl, isPendingImage, wi
     }
   }
   // Show transaction details for swap success/error or regular sends, or balance checks, or NFT creation, or price checks
-  const showDetailsSection = transactionDetails && (status === 'success' || status === 'error' || (status === 'pending' && /send|sending|transfer|swap|balance|nft|create|price|fetching/i.test(content)));
+  const showDetailsSection = transactionDetails && (status === 'success' || status === 'error' || (status === 'pending' && /send|sending|transfer|swap|balance|nft|create|price|fetching|executing atomic/i.test(content)));
   const hasSwapWidget = widgetParams && role === "assistant" && status !== 'success' && status !== 'error';
   
   // Extract main message text - for balance checks, price checks, and NFT creation, show simplified message
@@ -329,7 +370,28 @@ const ChatMessage = ({ role, content, status, txid, imageUrl, isPendingImage, wi
         {/* Transaction Details Section - show below message content */}
         {showDetailsSection && transactionDetails && (
           <div className="mb-3 p-3 bg-primary/5 rounded-lg border border-primary/10">
-            {isPriceCheck ? (
+            {transactionDetails.atomicTransfers ? (
+              <>
+                {transactionDetails.atomicTransfers.map((transfer: any, index: number) => (
+                  <div key={index} className={index < transactionDetails.atomicTransfers.length - 1 ? "mb-3 pb-3 border-b border-primary/10" : ""}>
+                    <div className="flex justify-between mb-2">
+                      <span className="text-base text-muted-foreground">Amount:</span>
+                      <span className="text-base font-semibold text-foreground">{transfer.displayAmount}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-base text-muted-foreground">To:</span>
+                      <span className="text-base font-semibold text-foreground">{transfer.to}</span>
+                    </div>
+                  </div>
+                ))}
+                {transactionDetails.fee && (
+                  <div className="flex justify-between mt-2 pt-2 border-t border-primary/10">
+                    <span className="text-base text-muted-foreground">Total Fee:</span>
+                    <span className="text-base font-semibold text-foreground">{transactionDetails.fee}</span>
+                  </div>
+                )}
+              </>
+            ) : isPriceCheck ? (
               <>
                 {/* Price check details - show each price with improved formatting */}
                 {priceEntries.length > 0 ? (
