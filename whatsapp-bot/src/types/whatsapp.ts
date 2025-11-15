@@ -126,7 +126,7 @@ export interface WhatsAppStatus {
  * Extracted message data for processing
  */
 export interface ExtractedMessage {
-  phoneNumber: string; // Phone number in E.164 format (e.g., +919876543210)
+  phoneNumber: string; // Phone number in E.164 format (e.g., +15551234567)
   messageText: string | null; // Text content, null if media message
   messageId: string;
   timestamp: string;
