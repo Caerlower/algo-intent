@@ -43,6 +43,14 @@ export class AIIntentService {
   private getSystemPrompt(): string {
     return `You are an intelligent Algorand assistant with deep knowledge of blockchain technology, DeFi, and trading. You must ONLY answer questions about Algorand, blockchain, crypto trading, DeFi, or digital assets. If the user asks about anything else, always reply: Sorry, I can only answer questions about Algorand, blockchain, trading, or digital assets.
 
+CRITICAL: PHONE NUMBER RECIPIENTS
+- Phone numbers are VALID recipients for send_algo and send_asset operations
+- Phone numbers ALWAYS start with + followed by digits (e.g., +1234567890, +15551234567, +1 555 123 4567)
+- When you see "send X algo to +[digits]" or "send X algo to +[digits with spaces]", the recipient is a PHONE NUMBER
+- Extract phone numbers EXACTLY as written (preserve spaces if present)
+- Examples of valid phone number recipients: "+15551234567", "+1 555 123 4567", "+1234567890"
+- Phone numbers work the same as addresses - just use them in the "recipient" field
+
 CAPABILITIES:
 1. Wallet Operations: send_algo, send_algo_multi, create_nft, send_nft, opt_in, opt_out, balance
 2. Trading Operations: trade_algo, swap_tokens, set_limit_order, set_stop_loss, check_prices
@@ -60,9 +68,9 @@ RESPONSE FORMAT:
 INTENT TYPES:
 
 WALLET OPERATIONS:
-- "send_algo": Send ALGO to single recipient
+- "send_algo": Send ALGO to single recipient (can be Algorand address or phone number in E.164 format like +1234567890)
 - "send_algo_multi": Send ALGO to multiple recipients
-- "send_asset": Send any asset (USDC, USDT, etc.) to recipient (requires asset_id parameter)
+- "send_asset": Send any asset (USDC, USDT, etc.) to recipient (can be Algorand address or phone number, requires asset_id parameter)
 - "create_nft": Create new NFT (supply 1, decimals 0)
 - "create_nft_with_image": Create NFT with uploaded image
 - "send_nft": Send NFT to recipient
@@ -128,7 +136,11 @@ IMPORTANT RULES:
 - If the user gives a single amount and multiple addresses, use that amount for each address.
 - If the user gives different amounts, match them to the addresses in order.
 - Never use indices or numbers as addresses.
-- Only use valid Algorand addresses in the recipients array.
+- Recipients can be Algorand addresses OR phone numbers.
+- Phone numbers ALWAYS start with + followed by digits (e.g., +1234567890, +15551234567, +1 555 123 4567).
+- When user provides a phone number, extract it EXACTLY as written (preserve spaces if present, the system will normalize automatically).
+- If you see a string starting with + followed by digits, it is ALWAYS a phone number, not an address.
+- Phone numbers are valid recipients for send_algo and send_asset intents - treat them the same as addresses.
 - If the user asks about anything outside Algorand, blockchain, crypto trading, DeFi, or digital assets, always reply: Sorry, I can only answer questions about Algorand, blockchain, trading, or digital assets.
 
 TOKEN MAPPING FOR SWAPS:
@@ -142,6 +154,28 @@ EXAMPLES:
 
 User: "Send 5 ALGO to ABC123..."
 {"intent": "send_algo", "parameters": {"amount": 5, "recipient": "ABC123..."}, "context": "User wants to send ALGO to a specific address"}
+
+User: "send 1 algo to +15551234567"
+{"intent": "send_algo", "parameters": {"amount": 1, "recipient": "+15551234567"}, "context": "User wants to send ALGO to a phone number"}
+
+User: "send 1 algo to +1 555 123 4567"
+{"intent": "send_algo", "parameters": {"amount": 1, "recipient": "+15551234567"}, "context": "User wants to send ALGO to a phone number"}
+
+User: "send 1 algo to +1 555 123 45678"
+{"intent": "send_algo", "parameters": {"amount": 1, "recipient": "+155512345678"}, "context": "User wants to send ALGO to a phone number"}
+
+User: "Send 2 ALGO to +1234567890"
+{"intent": "send_algo", "parameters": {"amount": 2, "recipient": "+1234567890"}, "context": "User wants to send ALGO to a phone number"}
+
+User: "send algo to +15551234567"
+{"intent": "send_algo", "parameters": {"amount": 1, "recipient": "+15551234567"}, "context": "User wants to send ALGO to a phone number"}
+
+PHONE NUMBER RECOGNITION:
+- ANY string starting with + followed by digits is a phone number
+- Phone numbers can have spaces, dashes, or parentheses (e.g., "+1 555 123 4567", "+1-234-567-8900", "+1 (234) 567-8900")
+- Extract phone numbers EXACTLY as the user provides them (including spaces if present)
+- The system will automatically normalize phone numbers (remove spaces, etc.)
+- Phone numbers are valid recipients for send_algo and send_asset intents
 
 User: "Trade 100 ALGO when price reaches $0.22"
 {"intent": "set_limit_order", "parameters": {"from_asset": "ALGO", "amount": 100, "trigger_price": 0.22, "trade_type": "limit"}, "context": "User wants to set a limit order to sell ALGO at $0.22"}
@@ -273,6 +307,23 @@ IMPORTANT:
       return null;
     }
 
+    // Fallback: Check if this is a phone number send request before calling AI
+    const phoneNumberPattern = /send\s+(\d+(?:\.\d+)?)\s+algo\s+to\s+(\+\d[\d\s\-\(\)\.]+)/i;
+    const phoneMatch = userInput.match(phoneNumberPattern);
+    if (phoneMatch) {
+      const amount = parseFloat(phoneMatch[1]) || 1;
+      const phoneNumber = phoneMatch[2].trim();
+      console.log('Detected phone number send request:', phoneNumber);
+      return {
+        intent: 'send_algo',
+        parameters: {
+          amount: amount,
+          recipient: phoneNumber
+        },
+        context: 'User wants to send ALGO to a phone number',
+      };
+    }
+
     try {
       const response = await fetch(`${this.baseUrl}/chat/completions`, {
         method: 'POST',
@@ -297,14 +348,45 @@ IMPORTANT:
 
       const data = await response.json();
       const content = data.choices[0].message.content;
-      return this.extractJson(content);
+      const parsed = this.extractJson(content, userInput);
+      
+      // If parsing failed but we detected a phone number, use fallback
+      if ('intent' in parsed && parsed.intent === 'unknown' && phoneMatch && phoneMatch[2]) {
+        const amount = parseFloat(phoneMatch[1]) || 1;
+        const phoneNumber = String(phoneMatch[2]).trim();
+        return {
+          intent: 'send_algo',
+          parameters: {
+            amount: amount,
+            recipient: phoneNumber
+          },
+          context: 'User wants to send ALGO to a phone number',
+        };
+      }
+      
+      return parsed;
     } catch (error) {
       console.error('AI Parsing Error:', error);
+      
+      // Final fallback: if AI fails but we detected phone number, use it
+      if (phoneMatch && phoneMatch[2]) {
+        const amount = parseFloat(phoneMatch[1]) || 1;
+        const phoneNumber = String(phoneMatch[2]).trim();
+        return {
+          intent: 'send_algo',
+          parameters: {
+            amount: amount,
+            recipient: phoneNumber
+          },
+          context: 'User wants to send ALGO to a phone number',
+        };
+      }
+      
       return null;
     }
   }
 
-  private extractJson(text: string): ParsedIntent | MultiIntent {
+  private extractJson(text: string, userInput?: string): ParsedIntent | MultiIntent {
     try {
       const start = text.indexOf('{');
       const end = text.lastIndexOf('}') + 1;
@@ -323,6 +405,24 @@ IMPORTANT:
       return parsed as ParsedIntent;
     } catch (error) {
       console.error('JSON extraction error:', error, '\nAI response:', text);
+      
+      // Try to detect if this is a send_algo request with phone number
+      const phoneNumberPattern = /send\s+(\d+(?:\.\d+)?)\s+algo\s+to\s+(\+\d[\d\s\-\(\)]+)/i;
+      const match = text.match(phoneNumberPattern);
+      if (match) {
+        const amount = parseFloat(match[1]) || 1;
+        const phoneNumber = match[2].trim();
+        console.log('Detected phone number send request via fallback:', phoneNumber);
+        return {
+          intent: 'send_algo',
+          parameters: {
+            amount: amount,
+            recipient: phoneNumber
+          },
+          context: 'User wants to send ALGO to a phone number',
+        };
+      }
+      
       return { 
         intent: 'unknown', 
         parameters: {},
