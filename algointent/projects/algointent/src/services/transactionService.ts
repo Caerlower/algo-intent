@@ -1,6 +1,8 @@
 import { algo, AlgorandClient } from '@algorandfoundation/algokit-utils';
 import type { TransactionSignerAccount } from '@algorandfoundation/algokit-utils/types/account';
 import algosdk, { Address, TransactionSigner } from 'algosdk';
+import { phoneNumberService } from './phoneNumberService';
+import { isPhoneNumber, isValidPhoneNumberStrict, normalizePhoneNumber } from '../utils/phoneNumberUtils';
 
 export interface TransactionResult {
   status: 'success' | 'error' | 'pending';
@@ -167,13 +169,42 @@ export class TransactionService {
     signer: TransactionSigner | TransactionSignerAccount | undefined
   ): Promise<TransactionResult> {
     try {
-      // Validate address
-      if (!this.isValidAddress(recipient)) {
-        return {
-          status: 'error',
-          message: '❌ Invalid recipient address format.',
-          error: 'Invalid address'
-        };
+      let recipientAddress = recipient;
+      let recipientDisplay = recipient;
+
+      // Check if recipient is a phone number
+      if (isPhoneNumber(recipient)) {
+        // Validate phone number format strictly (reject short numbers)
+        const normalized = normalizePhoneNumber(recipient);
+        if (!normalized || !isValidPhoneNumberStrict(normalized)) {
+          return {
+            status: 'error',
+            message: '❌ Invalid phone number format. Phone numbers must be in international format (e.g., +1234567890) with at least 9 digits.',
+            error: 'Invalid phone number'
+          };
+        }
+
+        try {
+          // Resolve phone number to wallet address via Hashi
+          recipientAddress = await phoneNumberService.resolvePhoneNumberToAddress(normalized);
+          recipientDisplay = normalized; // Show phone number in success message
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          return {
+            status: 'error',
+            message: `❌ Failed to resolve phone number: ${errorMessage}`,
+            error: errorMessage
+          };
+        }
+      } else {
+        // Validate Algorand address format
+        if (!this.isValidAddress(recipient)) {
+          return {
+            status: 'error',
+            message: '❌ Invalid recipient. Must be a valid Algorand address or phone number (e.g., +1234567890).',
+            error: 'Invalid address or phone number'
+          };
+        }
       }
 
       const signerAccount = this.resolveSigner(signer, sender);
@@ -182,16 +213,21 @@ export class TransactionService {
       const result = await this.algorand.send.payment({
         signer: signerAccount,
         sender: sender,
-        receiver: recipient,
+        receiver: recipientAddress,
         amount: algo(amount),
         validityWindow: 60n,
         maxRoundsToWaitForConfirmation: 20,
       });
 
+      // Format recipient display
+      const displayRecipient = isPhoneNumber(recipient) 
+        ? recipientDisplay 
+        : `${recipientAddress.substring(0, 6)}...${recipientAddress.substring(recipientAddress.length - 4)}`;
+
       return {
         status: 'success',
         txid: result.txIds[0],
-        message: `✅ Transaction successful! ${amount.toFixed(6)} ALGO sent to ${recipient}. Transaction ID: ${result.txIds[0]}`
+        message: `✅ Transaction successful! ${amount.toFixed(6)} ALGO sent to ${displayRecipient}. Transaction ID: ${result.txIds[0]}`
       };
 
     } catch (error) {
@@ -359,12 +395,42 @@ export class TransactionService {
     assetName?: string
   ): Promise<TransactionResult> {
     try {
-      if (!this.isValidAddress(recipient)) {
-        return {
-          status: 'error',
-          message: '❌ Invalid recipient address format.',
-          error: 'Invalid address'
-        };
+      let recipientAddress = recipient;
+      let recipientDisplay = recipient;
+
+      // Check if recipient is a phone number
+      if (isPhoneNumber(recipient)) {
+        // Validate phone number format strictly (reject short numbers)
+        const normalized = normalizePhoneNumber(recipient);
+        if (!normalized || !isValidPhoneNumberStrict(normalized)) {
+          return {
+            status: 'error',
+            message: '❌ Invalid phone number format. Phone numbers must be in international format (e.g., +1234567890) with at least 9 digits.',
+            error: 'Invalid phone number'
+          };
+        }
+
+        try {
+          // Resolve phone number to wallet address via Hashi
+          recipientAddress = await phoneNumberService.resolvePhoneNumberToAddress(normalized);
+          recipientDisplay = normalized; // Show phone number in success message
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          return {
+            status: 'error',
+            message: `❌ Failed to resolve phone number: ${errorMessage}`,
+            error: errorMessage
+          };
+        }
+      } else {
+        // Validate Algorand address format
+        if (!this.isValidAddress(recipient)) {
+          return {
+            status: 'error',
+            message: '❌ Invalid recipient. Must be a valid Algorand address or phone number (e.g., +1234567890).',
+            error: 'Invalid address or phone number'
+          };
+        }
       }
 
       if (amount <= 0 || Number.isNaN(amount)) {
@@ -420,7 +486,7 @@ export class TransactionService {
 
       // Ensure recipient is opted in
       try {
-        await algod.accountAssetInformation(recipient, assetId).do();
+        await algod.accountAssetInformation(recipientAddress, assetId).do();
       } catch (err: any) {
         const status = err?.statusCode ?? err?.response?.status;
         if (status === 404) {
@@ -436,17 +502,22 @@ export class TransactionService {
       const result = await this.algorand.send.assetTransfer({
         signer: signerAccount,
         sender: sender,
-        receiver: recipient,
+        receiver: recipientAddress,
         assetId: BigInt(assetId),
         amount: scaledAmount,
         validityWindow: 60n,
         maxRoundsToWaitForConfirmation: 20,
       });
 
+      // Format recipient display
+      const displayRecipient = isPhoneNumber(recipient) 
+        ? recipientDisplay 
+        : `${recipientAddress.substring(0, 6)}...${recipientAddress.substring(recipientAddress.length - 4)}`;
+
       return {
         status: 'success',
         txid: result.txIds[0],
-        message: `✅ Sent ${amount} ${assetName || `asset ${assetId}`} to ${recipient}`
+        message: `✅ Sent ${amount} ${assetName || `asset ${assetId}`} to ${displayRecipient}`
       };
 
     } catch (error) {
