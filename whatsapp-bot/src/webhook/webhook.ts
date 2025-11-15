@@ -22,6 +22,9 @@ const router = Router();
  * Returns the challenge if verification token matches, otherwise 403
  */
 router.get('/webhook', (req: Request, res: Response) => {
+  console.log('🔍 Webhook GET (verification) received at', new Date().toISOString());
+  console.log('📋 Query params:', JSON.stringify(req.query, null, 2));
+  
   const query = req.query as unknown as WebhookVerificationQuery;
   
   const mode = query['hub.mode'];
@@ -31,10 +34,13 @@ router.get('/webhook', (req: Request, res: Response) => {
   // Verify that this is a subscription request
   if (mode === 'subscribe' && token === process.env.WHATSAPP_VERIFY_TOKEN) {
     console.log('✅ Webhook verified successfully');
+    console.log('📤 Sending challenge:', challenge);
     res.status(200).send(challenge);
   } else {
     console.error('❌ Webhook verification failed:', {
       mode,
+      receivedToken: token,
+      expectedToken: process.env.WHATSAPP_VERIFY_TOKEN,
       tokenMatch: token === process.env.WHATSAPP_VERIFY_TOKEN,
       challengeProvided: !!challenge,
     });
@@ -52,6 +58,9 @@ router.get('/webhook', (req: Request, res: Response) => {
  * 3. Handling the message asynchronously via the in-process message processor
  */
 router.post('/webhook', async (req: Request, res: Response) => {
+  console.log('📥 Webhook POST received at', new Date().toISOString());
+  console.log('📦 Request body:', JSON.stringify(req.body, null, 2));
+  
   // Always return 200 OK immediately to Meta
   // This prevents Meta from retrying the webhook
   res.status(200).send('OK');
