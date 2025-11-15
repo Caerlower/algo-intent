@@ -10,12 +10,16 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 function normalizePhoneNumber(to: string): string {
+  // Remove all non-digit characters except +
   let formattedPhone = to.replace(/[^\d+]/g, '');
 
+  // Ensure phone number starts with +
   if (!formattedPhone.startsWith('+')) {
     formattedPhone = '+' + formattedPhone;
   }
 
+  // WhatsApp API expects phone number WITHOUT the + prefix
+  // Format: country code + number (e.g., "1234567890" not "+1234567890")
   return formattedPhone.replace(/^\+/, '');
 }
 
@@ -40,7 +44,7 @@ async function postWhatsAppMessage(payload: any) {
 /**
  * Send WhatsApp message
  *
- * @param to - Recipient phone number (with country code, e.g., +919350105090)
+ * @param to - Recipient phone number (with country code, e.g., +15551234567)
  * @param message - Message text to send
  * @returns Success status
  */
@@ -50,6 +54,9 @@ export async function sendWhatsAppMessage(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const formattedPhone = normalizePhoneNumber(to);
+    
+    console.log(`📤 Attempting to send message to phone number: ${formattedPhone}`);
+    console.log(`📤 Original phone number received: ${to}`);
 
     await postWhatsAppMessage({
       messaging_product: 'whatsapp',
