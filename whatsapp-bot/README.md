@@ -12,13 +12,17 @@ This bot allows users to interact with the Algorand blockchain through WhatsApp 
 ## 🏗️ Architecture
 
 ```
-WhatsApp → Meta Cloud API → Express Webhook → Message Processor → AlgoIntent Engine → Wallet → Algorand
+WhatsApp → Meta Cloud API → Express Webhook → Message Processor → AlgoIntent Engine → Hashi API → Vault → Algorand
 ```
+
+The bot uses **Hashi** (Hashicorp Vault-based wallet service) for secure key management. All private keys are stored in Vault and never exposed to the WhatsApp bot.
 
 ## 📋 Prerequisites
 
 - Node.js 18+ 
 - npm or yarn
+- **Hashi backend** running (see `../hashi/README.md` for setup)
+- **Hashicorp Vault** running and initialized
 - Meta WhatsApp Cloud API credentials:
   - App ID
   - Access Token
@@ -39,11 +43,14 @@ WhatsApp → Meta Cloud API → Express Webhook → Message Processor → AlgoIn
    cp env.example .env
    ```
    
-   Edit `.env` and add your credentials (see `SETUP.md` for details):
+   Edit `.env` and add your credentials
    - WhatsApp Access Token (from Meta Developer Console)
    - Verify Token (create a random secret string)
-   - Phone Number ID: `863072956888721` (already configured)
-   - App ID: `842628281464022` (already configured)
+   - Phone Number ID
+   - App ID
+   - **Hashi API URL**: `HASHI_API_URL=http://localhost:8081`
+   - **Hashi API Token**: `HASHI_API_TOKEN=<your_vault_root_token>` (from `hashi/vault-seal-keys.json`)
+   - **Perplexity API Key**: `PERPLEXITY_API_KEY=<your_key>` (for intent parsing)
 
 3. **Build TypeScript:**
    ```bash
@@ -98,7 +105,7 @@ The server logs:
 ```
 📨 Incoming message from +919876****: Send 2 ALGO to +573001234567
 📋 Message details: {
-  "phoneNumber": "+919876543210",
+  "phoneNumber": "+15551234567",
   "messageText": "Send 2 ALGO to +573001234567",
   "messageId": "wamid.xxx",
   ...
