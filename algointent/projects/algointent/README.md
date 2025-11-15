@@ -144,7 +144,6 @@ src/
 | Mainnet | ⚠️ Beta | https://explorer.perawallet.app/       |
 
 ## 🛡️ Troubleshooting & Tips
-
 - **Transaction says failed but went through?**  
   Always check the provided TxID in [Pera Explorer](https://testnet.explorer.perawallet.app) for final status.
 - **NFT/ALGO not received?**  

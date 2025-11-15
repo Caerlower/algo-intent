@@ -433,10 +433,20 @@ const Index = () => {
         return;
       }
 
+      // Check if parsing returned an error explanation
+      if ('intent' in parsedIntent && parsedIntent.intent === 'unknown' && parsedIntent.explanation) {
+        addBotMessage(parsedIntent.explanation);
+        // Still try to handle it in case there's a fallback
+        if (parsedIntent.explanation.includes('API key') || parsedIntent.explanation.includes('API error')) {
+          return; // Don't proceed if it's a configuration error
+        }
+      }
+
       // Handle different intents
       await handleIntent(parsedIntent, selectedFile || pendingImage?.file || null);
       
     } catch (error) {
+      console.error('Error in handleSendMessage:', error);
       addBotMessage(`❌ Error processing your request: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsProcessing(false);
