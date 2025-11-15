@@ -2,7 +2,7 @@
  * Script to get wallet address for a phone number
  * 
  * Usage: npm run get-wallet <phone-number>
- * Example: npm run get-wallet +919350105090
+ * Example: npm run get-wallet +15551234567
  */
 
 import dotenv from 'dotenv';
@@ -15,7 +15,7 @@ const phoneNumber = process.argv[2];
 if (!phoneNumber) {
   console.error('❌ Please provide a phone number');
   console.log('Usage: npm run get-wallet <phone-number>');
-  console.log('Example: npm run get-wallet +919350105090');
+  console.log('Example: npm run get-wallet +15551234567');
   process.exit(1);
 }
 
