@@ -54,6 +54,16 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Debug endpoint to test webhook reception
+app.post('/test-webhook', (req, res) => {
+  console.log('🧪 Test webhook received:', JSON.stringify(req.body, null, 2));
+  res.json({ 
+    received: true, 
+    body: req.body,
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Webhook routes
 app.use('/', webhookRouter);
 
@@ -92,6 +102,19 @@ const server = app.listen(PORT, () => {
     console.log('✅ Intent Engine configured (Perplexity API)');
   } else {
     console.warn('⚠️ PERPLEXITY_API_KEY not set - intent parsing will not work');
+  }
+
+  // Check Hashi API Configuration
+  if (process.env.HASHI_API_URL) {
+    console.log(`✅ Hashi API configured: ${process.env.HASHI_API_URL}`);
+  } else {
+    console.warn('⚠️ HASHI_API_URL not set - using default: http://localhost:8081');
+  }
+  
+  if (process.env.HASHI_API_TOKEN) {
+    console.log('✅ Hashi API token configured');
+  } else {
+    console.warn('⚠️ HASHI_API_TOKEN not set - wallet operations may fail');
   }
 });
 
