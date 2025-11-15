@@ -36,4 +36,4 @@ data/
 wallets.json
 
 ngrok.yml
-env.example
+# Note: env.example should be tracked as a template (not ignored)
