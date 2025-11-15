@@ -30,8 +30,6 @@
     "src/**/*.ts",
     "src/**/*.tsx",
     "vite.config.js",
-    "src/utils/",
-    "src/utils/",
     "src/main.tsx",
   ],
   "references": [
