@@ -8,15 +8,6 @@
 
 </div>
 
----
-
-**Link to the transactions done in the demo video:**
-- Atomic Swap: https://lora.algokit.io/testnet/transaction/BLLXOXELXVU4QU2W2YF2EOY2K3AYNCG4OOYISUIBKFLAADE7JFWQ
-- NFT Minting: https://lora.algokit.io/testnet/transaction/67XJRKTFTMGNRW34HBBCPGGOUMMNOIK5MDTNFWSPJ2VG5H6PK2VQ
-- SWAP 1 ALGO to USDC: https://lora.algokit.io/testnet/transaction/GEXN27RYIXKKEPFFX5P5RZKEA6HHTNVC6BK6GA7O3RZSUKOMEX7A
-- Sending ALGO to phone number: https://lora.algokit.io/testnet/transaction/MNE3474G2L2BQ4HQ6B2OGF3HEZAR2KNYKY2ILGMZTKZKDA37UY2Q
-- Sending ALGO from Phone number to Phone Number: https://lora.algokit.io/testnet/transaction/BDHVMYJ6XILMZXTD42C72H6DSUSYEXDEIRCQHB3JREUUWMWA3LIA
-
 - **Setup Video Link**: https://youtu.be/WtcqSkpF934
 
 ---
