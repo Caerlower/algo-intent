@@ -17,6 +17,8 @@ import NotFound from "./pages/NotFound";
 import { getAlgodConfigFromViteEnvironment } from './utils/network/getAlgoClientConfigs'
 import { SocialWalletProvider } from './providers/EnhancedWalletProvider'
 import { NetworkProvider } from './providers/NetworkProvider'
+import { Analytics } from "@vercel/analytics/react"
+import { SpeedInsights } from "@vercel/speed-insights/react"
 
 const queryClient = new QueryClient();
 
@@ -84,6 +86,8 @@ export default function App() {
                 <BrowserRouter>
                   <Layout />
                 </BrowserRouter>
+                <Analytics />
+                <SpeedInsights />
               </SocialWalletProvider>
             </WalletProvider>
           </TooltipProvider>
