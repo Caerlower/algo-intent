@@ -18,7 +18,7 @@ interface ImportMetaEnv {
   readonly VITE_KMD_PASSWORD: string
   readonly VITE_KMD_WALLET: string
 
-  readonly VITE_PERPLEXITY_API_KEY: string
+  readonly VITE_GROQ_API_KEY: string
   readonly VITE_COINGECKO_API_KEY: string
 }
 

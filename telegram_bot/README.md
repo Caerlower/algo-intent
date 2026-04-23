@@ -35,7 +35,7 @@ Telegram User
 Telegram Bot (python-telegram-bot)
      │
      ▼
-AI Intent Parser (Perplexity AI)
+AI Intent Parser (Groq API)
      │
      ▼
 Transaction Builder (Algorand SDK)
@@ -47,7 +47,7 @@ Algorand Blockchain (TestNet/MainNet)
 ### Core Components
 
 - **`telegram_bot.py`**: Main bot entrypoint and message handlers
-- **`ai_intent.py`**: AI-powered intent parsing using Perplexity AI
+- **`ai_intent.py`**: AI-powered intent parsing using Groq API
 - **`transaction_builder.py`**: Builds and sends Algorand transactions
 - **`wallet.py`**: Wallet creation, connection, and transaction signing
 - **`ipfs_utils.py`**: IPFS integration via Pinata for NFT media uploads
@@ -60,7 +60,7 @@ Algorand Blockchain (TestNet/MainNet)
 
 - **Python** 3.8 or higher
 - **Telegram Bot Token** from [@BotFather](https://t.me/BotFather)
-- **Perplexity AI API Key** from [Perplexity AI](https://www.perplexity.ai/)
+- **Groq API Key** from [Groq Console](https://console.groq.com/)
 - **Pinata API Keys** (for IPFS uploads) from [Pinata](https://www.pinata.cloud/)
 - **Algorand Node Access** (or use public testnet node)
 
@@ -90,7 +90,7 @@ Create a `.env` file in the `telegram_bot/` directory:
 TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
 
 # AI Intent Parsing
-PERPLEXITY_API_KEY=your_perplexity_api_key_here
+GROQ_API_KEY=your_groq_api_key_here
 
 # IPFS Configuration (Pinata)
 PINATA_API_KEY=your_pinata_api_key
@@ -112,11 +112,11 @@ NETWORK=testnet
 2. Send `/newbot` and follow the instructions
 3. Copy the bot token and add it to `.env`
 
-#### Perplexity AI API Key
-1. Visit [Perplexity AI](https://www.perplexity.ai/)
-2. Sign up and navigate to API settings
+#### Groq API Key
+1. Visit [Groq Console](https://console.groq.com/)
+2. Sign up and navigate to API keys
 3. Generate an API key
-4. Add it to `.env` as `PERPLEXITY_API_KEY`
+4. Add it to `.env` as `GROQ_API_KEY`
 
 #### Pinata API Keys (for NFT media uploads)
 1. Sign up at [Pinata](https://www.pinata.cloud/)
@@ -228,7 +228,7 @@ Check my balance
 ```
 telegram_bot/
 ├── telegram_bot.py          # Main bot entrypoint
-├── ai_intent.py              # AI intent parsing (Perplexity AI)
+├── ai_intent.py              # AI intent parsing (Groq API)
 ├── intent_parser.py          # Fallback intent parsing
 ├── transaction_builder.py    # Transaction building and sending
 ├── wallet.py                 # Wallet creation and management
@@ -330,7 +330,7 @@ View your transactions:
 ### Intent Not Understood
 - Try rephrasing your command
 - Use the example commands from this README
-- Check that `PERPLEXITY_API_KEY` is valid
+- Check that `GROQ_API_KEY` is valid
 
 ---
 

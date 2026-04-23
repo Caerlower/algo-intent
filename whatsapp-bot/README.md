@@ -50,7 +50,7 @@ The bot uses **Hashi** (Hashicorp Vault-based wallet service) for secure key man
    - App ID
    - **Hashi API URL**: `HASHI_API_URL=http://localhost:8081`
    - **Hashi API Token**: `HASHI_API_TOKEN=<your_vault_root_token>` (from `hashi/vault-seal-keys.json`)
-   - **Perplexity API Key**: `PERPLEXITY_API_KEY=<your_key>` (for intent parsing)
+  - **Groq API Key**: `GROQ_API_KEY=<your_key>` (for intent parsing)
 
 3. **Build TypeScript:**
    ```bash

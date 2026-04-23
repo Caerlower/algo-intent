@@ -70,7 +70,7 @@ AlgoIntent consists of three main components:
                        ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                  AI Intent Parser                            │
-│  (Perplexity AI API - Natural Language → Structured Intent) │
+│    (Groq API - Natural Language → Structured Intent)        │
 └──────────────────────┬──────────────────────────────────────┘
                        │
                        ▼
@@ -96,7 +96,7 @@ AlgoIntent consists of three main components:
 - **Python** 3.8+ (for Telegram bot)
 - **Algorand Wallet** (Pera, Defly, or Exodus for web app)
 - **API Keys**:
-  - Perplexity AI API key (for intent parsing)
+  - Groq API key (for intent parsing)
   - Pinata API keys (for IPFS uploads - Telegram bot)
   - Meta WhatsApp Cloud API credentials (for WhatsApp bot)
 
@@ -113,7 +113,7 @@ npm install
 cp env.template .env
 
 # Add your API keys to .env
-# VITE_PERPLEXITY_API_KEY=your_key_here
+# VITE_GROQ_API_KEY=your_key_here
 # VITE_ALGOD_ADDRESS=https://testnet-api.algonode.cloud
 # VITE_NETWORK=testnet
 
@@ -137,7 +137,7 @@ pip install -r requirements.txt
 
 # Create .env file with:
 # TELEGRAM_BOT_TOKEN=your_bot_token
-# PERPLEXITY_API_KEY=your_api_key
+# GROQ_API_KEY=your_api_key
 # PINATA_API_KEY=your_pinata_key
 # PINATA_API_SECRET=your_pinata_secret
 # ALGOD_ADDRESS=https://testnet-api.algonode.cloud
@@ -275,7 +275,7 @@ Opt-in ASA 12345
 - **Trading**: `@tinymanorg/tinyman-swap-widget-sdk`
 
 ### Backend Services
-- **AI Intent Parsing**: Perplexity AI API
+- **AI Intent Parsing**: Groq API
 - **IPFS Storage**: Pinata API
 - **Social Login Backend**: HashiCorp Vault API for secure wallet key storage and transaction signing
 - **Blockchain**: Algorand Testnet/Mainnet
@@ -351,7 +351,7 @@ algo-intent/
 ## 🧩 Key Features
 
 ### AI-Powered Intent Parsing
-- Natural language understanding via Perplexity AI
+- Natural language understanding via Groq API
 - Context-aware responses
 - Multi-intent support (e.g., "Send ALGO and opt-in to asset")
 
@@ -399,7 +399,7 @@ A: Yes, but it's currently in beta. Change your network configuration to mainnet
 A: Yes. The web app never stores your private keys - all transactions are signed by your connected wallet. The Telegram bot encrypts and deletes sensitive data immediately after use.
 
 **Q: How does the AI understand my commands?**  
-A: We use Perplexity AI to parse natural language into structured intents, which are then executed as Algorand transactions.
+A: We use Groq API (`llama-3.3-70b-versatile`) to parse natural language into structured intents, which are then executed as Algorand transactions.
 
 **Q: What wallets are supported?**  
 A: Web app supports Pera Wallet, Defly, and Exodus. Telegram and WhatsApp bots manage wallets internally.

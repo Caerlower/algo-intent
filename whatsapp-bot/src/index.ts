@@ -97,11 +97,11 @@ const server = app.listen(PORT, () => {
     console.log(`🔐 App ID: ${process.env.WHATSAPP_APP_ID || 'Not set'}`);
   }
 
-  // Check Perplexity API Key
-  if (process.env.PERPLEXITY_API_KEY) {
-    console.log('✅ Intent Engine configured (Perplexity API)');
+  // Check Groq API Key
+  if (process.env.GROQ_API_KEY) {
+    console.log('✅ Intent Engine configured (Groq API)');
   } else {
-    console.warn('⚠️ PERPLEXITY_API_KEY not set - intent parsing will not work');
+    console.warn('⚠️ GROQ_API_KEY not set - intent parsing will not work');
   }
 
   // Check Hashi API Configuration

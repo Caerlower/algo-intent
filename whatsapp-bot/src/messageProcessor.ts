@@ -3,7 +3,7 @@
  *
  * Handles incoming WhatsApp messages synchronously:
  * 1. Detect greetings and send onboarding response
- * 2. Parse intents via AlgoIntent engine (Perplexity)
+ * 2. Parse intents via AlgoIntent engine (Groq)
  * 3. Execute Algorand transactions based on parsed intent
  * 4. Send WhatsApp replies with status / errors
  */

@@ -12,7 +12,7 @@ Create a `.env` file in the project root:
 
 ```env
 # Required: AI Intent Parsing
-VITE_PERPLEXITY_API_KEY=your_perplexity_api_key_here
+VITE_GROQ_API_KEY=your_groq_api_key_here
 
 # Optional: IPFS Upload (for NFT media)
 VITE_PINATA_API_KEY=your_pinata_api_key_here
@@ -21,10 +21,10 @@ VITE_PINATA_API_SECRET=your_pinata_api_secret_here
 
 ### 3. Get API Keys
 
-#### Perplexity API (Required)
-1. Go to [perplexity.ai](https://perplexity.ai)
+#### Groq API (Required)
+1. Go to [console.groq.com](https://console.groq.com)
 2. Sign up for a free account
-3. Go to API settings
+3. Go to API Keys
 4. Copy your API key
 5. Paste it in your `.env` file
 

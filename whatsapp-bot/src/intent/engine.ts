@@ -2,7 +2,7 @@
  * AlgoIntent Engine - Natural Language Intent Parsing
  * 
  * Adapted from web app's aiIntentService.ts for Node.js
- * Uses Perplexity API to parse natural language into structured intents
+ * Uses Groq API to parse natural language into structured intents
  */
 
 import dotenv from 'dotenv';
@@ -12,9 +12,9 @@ import { ParsedIntent, IntentParameters } from './types';
 dotenv.config();
 
 /**
- * Perplexity API Response Types
+ * Chat Completion API Response Types
  */
-interface PerplexityChoice {
+interface ChatCompletionChoice {
   message: {
     content: string;
     role: string;
@@ -22,8 +22,8 @@ interface PerplexityChoice {
   finish_reason?: string;
 }
 
-interface PerplexityResponse {
-  choices: PerplexityChoice[];
+interface ChatCompletionResponse {
+  choices: ChatCompletionChoice[];
   id?: string;
   model?: string;
   created?: number;
@@ -34,12 +34,12 @@ export class IntentEngine {
   private baseUrl: string;
 
   constructor() {
-    this.apiKey = process.env.PERPLEXITY_API_KEY || '';
-    this.baseUrl = 'https://api.perplexity.ai';
+    this.apiKey = process.env.GROQ_API_KEY || '';
+    this.baseUrl = 'https://api.groq.com/openai/v1';
   }
 
   /**
-   * Get system prompt for Perplexity API
+   * Get system prompt for Groq API
    * Same prompt as web app for consistency
    */
   private getSystemPrompt(): string {
@@ -193,7 +193,7 @@ IMPORTANT: Only output a single JSON object as your response. Do not include any
    */
   async parseIntent(userInput: string): Promise<ParsedIntent | null> {
     if (!this.apiKey) {
-      console.error('❌ PERPLEXITY_API_KEY not found in environment variables');
+      console.error('❌ GROQ_API_KEY not found in environment variables');
       return null;
     }
 
@@ -210,7 +210,7 @@ IMPORTANT: Only output a single JSON object as your response. Do not include any
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'sonar-pro',
+          model: 'llama-3.3-70b-versatile',
           messages: [
             { role: 'system', content: this.getSystemPrompt() },
             { role: 'user', content: userInput.trim() }
@@ -225,7 +225,7 @@ IMPORTANT: Only output a single JSON object as your response. Do not include any
         throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
       }
 
-      const data = await response.json() as PerplexityResponse;
+      const data = await response.json() as ChatCompletionResponse;
       
       if (!data.choices || !Array.isArray(data.choices) || data.choices.length === 0) {
         throw new Error('Invalid API response: missing choices array');

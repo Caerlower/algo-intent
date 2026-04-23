@@ -86,8 +86,8 @@ to mint NFTs with media!
     VITE_ALGOD_PORT=443
     VITE_ALGOD_TOKEN=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
-    # AI Intent Parsing (Perplexity API)
-    VITE_PERPLEXITY_API_KEY=your_perplexity_api_key_here
+    # AI Intent Parsing (Groq API)
+    VITE_GROQ_API_KEY=your_groq_api_key_here
 
     # Market Data (CoinGecko API - Optional)
     VITE_COINGECKO_API_KEY=your_coingecko_api_key_here
@@ -98,7 +98,7 @@ to mint NFTs with media!
     ```
 
 4. **Get API Keys:**
-    - **Perplexity API:** Sign up at [perplexity.ai](https://perplexity.ai) to get your API key
+    - **Groq API:** Sign up at [console.groq.com](https://console.groq.com) to get your API key
     - **CoinGecko API:** Sign up at [coingecko.com](https://coingecko.com) for market data (optional)
     - **Pinata API:** Sign up at [pinata.cloud](https://pinata.cloud) to get your API keys
 

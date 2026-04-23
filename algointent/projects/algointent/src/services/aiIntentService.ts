@@ -36,8 +36,8 @@ export class AIIntentService {
   private baseUrl: string;
 
   constructor() {
-    this.apiKey = import.meta.env.VITE_PERPLEXITY_API_KEY || '';
-    this.baseUrl = 'https://api.perplexity.ai';
+    this.apiKey = import.meta.env.VITE_GROQ_API_KEY || '';
+    this.baseUrl = 'https://api.groq.com/openai/v1';
   }
 
   /**
@@ -380,7 +380,7 @@ IMPORTANT:
 
   async parseIntent(userInput: string): Promise<ParsedIntent | MultiIntent | null> {
     if (!this.apiKey) {
-      console.error('PERPLEXITY_API_KEY not found in environment variables');
+      console.error('VITE_GROQ_API_KEY not found in environment variables');
       return null;
     }
 
@@ -392,7 +392,7 @@ IMPORTANT:
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'sonar-pro',
+          model: 'llama-3.3-70b-versatile',
           messages: [
             { role: 'system', content: this.getSystemPrompt() },
             { role: 'user', content: userInput }

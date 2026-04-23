@@ -85,9 +85,9 @@ export default function App() {
                 <Sonner />
                 <BrowserRouter>
                   <Layout />
+                  <Analytics />
+                  <SpeedInsights />
                 </BrowserRouter>
-                <Analytics />
-                <SpeedInsights />
               </SocialWalletProvider>
             </WalletProvider>
           </TooltipProvider>

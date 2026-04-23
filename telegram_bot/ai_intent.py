@@ -5,13 +5,13 @@ from typing import Optional, Dict
 
 class AIIntentParser:
     def __init__(self):
-        self.api_key = os.getenv("PERPLEXITY_API_KEY")
+        self.api_key = os.getenv("GROQ_API_KEY")
         if not self.api_key:
-            raise ValueError("PERPLEXITY_API_KEY not found in environment variables")
+            raise ValueError("GROQ_API_KEY not found in environment variables")
             
         self.client = OpenAI(
             api_key=self.api_key,
-            base_url="https://api.perplexity.ai"
+            base_url="https://api.groq.com/openai/v1"
         )  # Fixed: Added missing closing parenthesis
         
         self.system_prompt = """Analyze Algorand-related requests and return JSON with:
@@ -108,7 +108,7 @@ User: "Transfer NFT 456 to ADDRESS1 and ADDRESS2"
     def parse(self, user_input: str) -> Optional[Dict]:
         try:
             response = self.client.chat.completions.create(
-                model="sonar-pro",
+                model="llama-3.3-70b-versatile",
                 messages=[
                     {"role": "system", "content": self.system_prompt},
                     {"role": "user", "content": user_input}
