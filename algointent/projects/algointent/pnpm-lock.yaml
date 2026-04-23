@@ -104,6 +104,9 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.83.0
         version: 5.99.2(react@18.3.1)
+      '@tinymanorg/tinyman-js-sdk':
+        specifier: ^5.1.4
+        version: 5.1.4
       '@tinymanorg/tinyman-swap-widget-sdk':
         specifier: ^1.1.0
         version: 1.1.1
